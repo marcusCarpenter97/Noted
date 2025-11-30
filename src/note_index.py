@@ -18,9 +18,14 @@ class NoteIndex:
         self.db.commit_to_database()
         return cursor.lastrowid
 
-    def retreive_tokens_for_note(self, note_id):
+    def retrieve_tokens_for_note(self, note_id):
         cursor = self.db.get_database_cursor()
         cursor.execute("SELECT * FROM tokens WHERE note_id = ?", (note_id,))
+        return cursor.fetchall()
+
+    def retrieve_similar_tokens(self, token):
+        cursor = self.db.get_database_cursor()
+        cursor.execute("SELECT note_id, count FROM tokens WHERE token = ?", (token,))
         return cursor.fetchall()
 
     def delete_tokens_for_note(self, note_id):
