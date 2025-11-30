@@ -19,6 +19,11 @@ class NoteIndex:
             self.db.commit_to_database()
         return cursor.lastrowid
 
+    def insert_many_tokens(self, rows):
+        cursor = self.db.get_database_cursor()
+        cursor.executemany("INSERT INTO tokens (note_id, token, count) VALUES (?, ?, ?)", rows)
+        self.db.commit_to_database()
+
     def retrieve_tokens_for_note(self, note_id):
         cursor = self.db.get_database_cursor()
         cursor.execute("SELECT * FROM tokens WHERE note_id = ?", (note_id,))

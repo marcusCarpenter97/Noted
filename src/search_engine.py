@@ -19,10 +19,8 @@ class SearchEngine:
         tokens = self.tokenizer.tokenize(note_text)
         token_count = self.tokenizer.count(tokens)
         
-        for token, count in token_count.items():
-            self.notes_index.insert_token(note_id, token, count, commit=False)
-
-        self.notes_index.commit_to_database()
+        rows = [(note_id, token, count) for token, count in token_count.items()]
+        self.notes_index.insert_many_tokens(rows)
 
     def update_index(self, note_id):
         self.notes_index.delete_tokens_for_note(note_id)
