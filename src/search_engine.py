@@ -1,4 +1,4 @@
-import logging 
+import logging
 from collections import defaultdict
 from notes_repository import NotesRepository
 
@@ -12,7 +12,7 @@ class SearchEngine:
         note = self.notes_repo.get_note(note_id)
 
         if note is None:
-            logging.error("Could not index node with ID {note_id} because it does not exist.")
+            logging.error(f"Could not index node with ID {note_id} because it does not exist.")
             return
 
         note_text = f"{note[1]} {note[2]} {note[5]}" # Merge title, body, and tags.
@@ -20,7 +20,9 @@ class SearchEngine:
         token_count = self.tokenizer.count(tokens)
         
         for token, count in token_count.items():
-            self.notes_index.insert_token(note_id, token, count)
+            self.notes_index.insert_token(note_id, token, count, commit=False)
+
+        self.notes_index.commit_to_database()
 
     def update_index(self, note_id):
         self.notes_index.delete_tokens_for_note(note_id)
@@ -43,4 +45,4 @@ class SearchEngine:
                 result_scores[note_id] += count
 
         final_result = list(result_scores.items())
-        return sorted(final_result, key=lambda x: x[1])
+        return sorted(final_result, key=lambda x: x[1], reverse=True)

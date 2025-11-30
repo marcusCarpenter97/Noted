@@ -12,10 +12,11 @@ class NoteIndex:
                         count INTEGER,
                         FOREIGN KEY (note_id) REFERENCES notes (id))""")
 
-    def insert_token(self, note_id, token, count):
+    def insert_token(self, note_id, token, count, commit=True):
         cursor = self.db.get_database_cursor()
         cursor.execute("INSERT INTO tokens (note_id, token, count) VALUES(?, ?, ?)", (note_id, token, count))
-        self.db.commit_to_database()
+        if commit:
+            self.db.commit_to_database()
         return cursor.lastrowid
 
     def retrieve_tokens_for_note(self, note_id):
@@ -31,4 +32,7 @@ class NoteIndex:
     def delete_tokens_for_note(self, note_id):
         cursor = self.db.get_database_cursor()
         cursor.execute("DELETE FROM tokens WHERE note_id = ?", (note_id,))
+        self.db.commit_to_database()
+
+    def commit_to_database(self):
         self.db.commit_to_database()
