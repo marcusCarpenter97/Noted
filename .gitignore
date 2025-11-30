@@ -1,5 +1,6 @@
 *.db
 *.log
+*.swp
 docs/
 venv/
 src/__pycache__/
