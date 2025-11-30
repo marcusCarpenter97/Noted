@@ -1,3 +1,4 @@
+import logging 
 import sqlite3
 import numpy as np
 
@@ -15,7 +16,7 @@ class Database:
             return cls._instance
 
         if database_name != cls._instance.name:
-            print(f"Warning: Database already initialized with {cls._instance.name}, ignoring new name {database_name}.")
+            logging.warning(f"Warning: Database already initialized with {cls._instance.name}, ignoring new name {database_name}.")
         return cls._instance
 
     def __init__(self, database_name=DATABASE_NAME):

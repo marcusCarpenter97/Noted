@@ -1,4 +1,5 @@
 *.db
+*.log
 docs/
 venv/
 src/__pycache__/

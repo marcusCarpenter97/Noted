@@ -1,9 +1,14 @@
+import logging
 import numpy as np
 from database import Database
 
 def main():
 
     print("\nWelcome to Noted.\n")
+
+    logging.basicConfig(filename="noted.log",
+                        level=logging.INFO,
+                        format="%(asctime)s - %(levelname)s - %(message)s")
 
     db = Database()
     db.create_notes_table()
