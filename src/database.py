@@ -25,6 +25,7 @@ class Database:
 
         self.name = database_name
         self.connection = sqlite3.connect(database_name)
+        self.connection.row_factory = sqlite3.Row
         self._initialized = True
 
     def get_database_cursor(self):
