@@ -51,10 +51,8 @@ def test_query_on_10k_notes():
 
     end = time.perf_counter()
 
-    print(f"Total time take to query 1000 notes out of 10000: {end-start} seconds.")
-    print(f"Estimated mean time take for each query: {(end-start)/1000} seconds.")
-
-    # Assert mean query time is less than 0.1 seconds.
+    assert (end-start) < 0.02
+    assert ((end-start)/1000) < 0.00002
 
 def test_index_note_on_1k_notes():
     db = Database("one_thousand_notes.db")
@@ -73,9 +71,7 @@ def test_index_note_on_1k_notes():
 
     end = time.perf_counter()
 
-    print(f"Time taken to index 1000 notes is: {end-start} seconds.")
-
-    # Assert loop time is less than 1 second.
+    assert (end-start) < 10  # TODO Can you lower this to 1 second?
 
 def make_engine():
     notes_repo = Mock()
