@@ -1,3 +1,4 @@
+import uuid
 
 class NotesRepository:
     def __init__(self, db):
@@ -6,7 +7,7 @@ class NotesRepository:
     def create_notes_table(self):
         cursor = self.db.get_database_cursor()
         cursor.execute("""CREATE TABLE IF NOT EXISTS notes(
-                        id INTEGER PRIMARY KEY,
+                        uuid TEXT PRIMARY KEY,
                         title TEXT,
                         contents TEXT,
                         created_at DATETIME,
@@ -17,14 +18,15 @@ class NotesRepository:
 
     def create_note(self, title, contents, embeddings, tags):
         cursor = self.db.get_database_cursor()
-        cursor.execute("INSERT INTO notes (title, contents, created_at, last_updated, embeddings, tags) VALUES(?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?)",
-                        (title, contents, embeddings, tags))
+        unique_id = str(uuid.uuid4())
+        cursor.execute("INSERT INTO notes (uuid, title, contents, created_at, last_updated, embeddings, tags) VALUES(?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?)",
+                        (unique_id, title, contents, embeddings, tags))
         self.db.commit_to_database()
-        return cursor.lastrowid
+        return unique_id
 
     def get_note(self, note_id):
         cursor = self.db.get_database_cursor()
-        cursor.execute("SELECT * FROM notes WHERE id=(?)", (note_id,))
+        cursor.execute("SELECT * FROM notes WHERE uuid=(?)", (note_id,))
         return cursor.fetchone()
 
     def list_all_notes(self, include_deleted=False):
@@ -36,8 +38,7 @@ class NotesRepository:
         cursor.execute(query)
         return cursor.fetchall()
 
-    def update_note(self, note_id, title=None, contents=None, tags=None):
-        # TODO remember to update embeddings when updating a note. This recalculation must not occur in this method.
+    def update_note(self, note_id, title=None, contents=None, embeddings=None, tags=None):
         cursor = self.db.get_database_cursor()
 
         updates = []
@@ -51,6 +52,10 @@ class NotesRepository:
             updates.append("contents = ?")
             params.append(contents)
 
+        if embeddings is not None:
+            updates.append("embeddings = ?")
+            params.append(embeddings)
+
         if tags is not None:
             updates.append("tags = ?")
             params.append(tags)
@@ -60,7 +65,7 @@ class NotesRepository:
         if not params and len(updates) == 1:
             return None
 
-        query = f"UPDATE notes SET {', '.join(updates)} WHERE id = ?"
+        query = f"UPDATE notes SET {', '.join(updates)} WHERE uuid = ?"
         params.append(note_id)
 
         cursor.execute(query, params)
@@ -75,5 +80,5 @@ class NotesRepository:
 
     def mark_note_as_deleted(self, note_id):
         cursor = self.db.get_database_cursor()
-        cursor.execute("UPDATE notes SET deleted = 1 WHERE id = ?", (note_id,))
+        cursor.execute("UPDATE notes SET deleted = 1 WHERE uuid = ?", (note_id,))
         self.db.commit_to_database()
