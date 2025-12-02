@@ -11,13 +11,13 @@ class SyncManager:
         self.notes_repo = notes_repository
         self.api_client = api_client
 
-    def get_last_sync(self, sync_file="last_sync_at.json"):
+    def get_last_sync(self, sync_file="last_sync_at.json", default_last_sync="1970-01-01T00:00:00Z"):
         try:
             with open(sync_file) as f:
                 return json.load(f)
         except FileNotFoundError as e:
-            logging.critical(e)
-            raise SystemExit
+            logging.warning(e)
+            return {"last_sync": default_last_sync}
 
     def sync_up(self):
         """ Send new changes to the server. """
