@@ -9,6 +9,7 @@ class NotesRepository:
                         id INTEGER PRIMARY KEY,
                         title TEXT,
                         contents TEXT,
+                        created_at DATETIME,
                         last_updated DATETIME,
                         embeddings BLOB,
                         tags TEXT,
@@ -16,7 +17,7 @@ class NotesRepository:
 
     def create_note(self, title, contents, embeddings, tags):
         cursor = self.db.get_database_cursor()
-        cursor.execute("INSERT INTO notes (title, contents, last_updated, embeddings, tags) VALUES(?, ?, CURRENT_TIMESTAMP, ?, ?)",
+        cursor.execute("INSERT INTO notes (title, contents, created_at, last_updated, embeddings, tags) VALUES(?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?)",
                         (title, contents, embeddings, tags))
         self.db.commit_to_database()
         return cursor.lastrowid
@@ -54,7 +55,9 @@ class NotesRepository:
             updates.append("tags = ?")
             params.append(tags)
 
-        if not updates:
+        updates.append("last_updated = CURRENT_TIMESTAMP")
+
+        if not params and len(updates) == 1:
             return None
 
         query = f"UPDATE notes SET {', '.join(updates)} WHERE id = ?"
@@ -62,6 +65,13 @@ class NotesRepository:
 
         cursor.execute(query, params)
         self.db.commit_to_database()
+
+    def get_notes_since_last_sync(self, last_sync):
+        # Get all notes whose last_updated is more recent than last_sync.
+        cursor = self.db.get_database_cursor()
+        query = "SELECT * FROM notes WHERE last_updated > ?"
+        cursor.execute(query, (last_sync,))
+        return cursor.fetchall()
 
     def mark_note_as_deleted(self, note_id):
         cursor = self.db.get_database_cursor()
