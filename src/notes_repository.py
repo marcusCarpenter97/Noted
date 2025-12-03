@@ -1,8 +1,9 @@
 import uuid
 
 class NotesRepository:
-    def __init__(self, db):
+    def __init__(self, db, li):
         self.db = db
+        self.lexical_index = li
 
     def create_notes_table(self):
         cursor = self.db.get_database_cursor()
@@ -19,9 +20,9 @@ class NotesRepository:
     def create_note(self, title, contents, embeddings, tags):
         cursor = self.db.get_database_cursor()
         unique_id = str(uuid.uuid4())
-        cursor.execute("INSERT INTO notes (uuid, title, contents, created_at, last_updated, embeddings, tags) VALUES(?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?)",
-                        (unique_id, title, contents, embeddings, tags))
+        cursor.execute("INSERT INTO notes (uuid, title, contents, created_at, last_updated, embeddings, tags) VALUES(?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?)", (unique_id, title, contents, embeddings, tags))
         self.db.commit_to_database()
+        self.lexical_index.index_note_for_lexical_search(uuid, title, contents)
         return unique_id
 
     def insert_note(self, uuid, title, contents, created_at, last_updated, embeddings, tags):

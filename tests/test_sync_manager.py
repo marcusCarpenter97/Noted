@@ -3,10 +3,12 @@ from unittest.mock import Mock
 from database import Database
 from notes_repository import NotesRepository
 from sync_manager import SyncManager
+from lexical_index import LexicalIndex
 
 def test_sync_down_creates_new_note():
     db = Database(":memory:")
-    repo = NotesRepository(db)
+    li = LexicalIndex(db)
+    repo = NotesRepository(db, li)
     repo.create_notes_table()
 
     fake_remote_note = {

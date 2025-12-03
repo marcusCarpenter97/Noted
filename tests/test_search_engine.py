@@ -4,6 +4,7 @@ import random
 import numpy as np
 from unittest.mock import Mock
 from notes_repository import NotesRepository
+from lexical_index import LexicalIndex
 from search_engine import SearchEngine
 from note_index import NoteIndex
 from tokenizer import Tokenizer
@@ -19,7 +20,8 @@ def reset_db():
 def test_index_note():
     db = Database(":memory:") 
 
-    nr = NotesRepository(db)
+    li = LexicalIndex(db)
+    nr = NotesRepository(db, li)
     nr.create_notes_table()
 
     fake_embedding = np.array([0.123, 0.69, 0.93]).astype('float32').tobytes()
@@ -39,7 +41,8 @@ def test_index_note():
 def test_query_on_10k_notes():
     db = Database("ten_thousand_notes.db")
 
-    nr = NotesRepository(db)
+    li = LexicalIndex(db)
+    nr = NotesRepository(db, li)
 
     # Query one thousand random notes from the database.
     random_note_ids = random.sample(range(1, 10000), 1000)
@@ -57,7 +60,8 @@ def test_query_on_10k_notes():
 def test_index_note_on_1k_notes():
     db = Database("one_thousand_notes.db")
 
-    nr = NotesRepository(db)
+    li = LexicalIndex(db)
+    nr = NotesRepository(db, li)
     ni = NoteIndex(db)
     ni.create_word_index_table()
     tk = Tokenizer()
