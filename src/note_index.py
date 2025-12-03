@@ -7,10 +7,10 @@ class NoteIndex:
         cursor = self.db.get_database_cursor()
         cursor.execute("""CREATE TABLE IF NOT EXISTS tokens(
                         id INTEGER PRIMARY KEY,
-                        note_id INTEGER,
+                        note_id TEXT,
                         token TEXT,
                         count INTEGER,
-                        FOREIGN KEY (note_id) REFERENCES notes (id))""")
+                        FOREIGN KEY (note_id) REFERENCES notes (uuid))""")
 
     def insert_token(self, note_id, token, count, commit=True):
         cursor = self.db.get_database_cursor()
