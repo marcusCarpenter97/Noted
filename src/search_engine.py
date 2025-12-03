@@ -35,12 +35,15 @@ class SearchEngine:
         result_scores = defaultdict(int)
 
         for token in query_tokens:
+            # Retreive all note UUIDs (and token frequency) that contain that token.
             similar_tokens = self.notes_index.retrieve_similar_tokens(token)
 
+            # Score the UUID by token count.
             for note_id, count in similar_tokens:
                 if note_id not in result_scores:
                     result_scores[note_id] = 0
                 result_scores[note_id] += count
 
+        # Return a sorted list of UUIDs based on token frequency.
         final_result = list(result_scores.items())
         return sorted(final_result, key=lambda x: x[1], reverse=True)
