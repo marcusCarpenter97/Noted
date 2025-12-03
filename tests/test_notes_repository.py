@@ -89,17 +89,18 @@ def test_get_notes_since_last_sync():
 
     # Insert 3 notes with known timestamps
     cursor = db.get_database_cursor()
+
     cursor.execute(
-        "INSERT INTO notes (title, contents, last_updated, embeddings, tags) "
-        "VALUES ('A', 'x', '2025-01-01 10:00:00', ?, 't')", (b'x',)
+        "INSERT INTO notes (uuid, title, contents, last_updated, embeddings, tags) "
+        "VALUES ('abc', 'A', 'x', '2025-01-01 10:00:00', ?, 't')", (b'x',)
     )
     cursor.execute(
-        "INSERT INTO notes (title, contents, last_updated, embeddings, tags) "
-        "VALUES ('B', 'y', '2025-01-02 10:00:00', ?, 't')", (b'y',)
+        "INSERT INTO notes (uuid, title, contents, last_updated, embeddings, tags) "
+        "VALUES ('def', 'B', 'y', '2025-01-02 10:00:00', ?, 't')", (b'y',)
     )
     cursor.execute(
-        "INSERT INTO notes (title, contents, last_updated, embeddings, tags) "
-        "VALUES ('C', 'z', '2025-01-03 10:00:00', ?, 't')", (b'z',)
+        "INSERT INTO notes (uuid, title, contents, last_updated, embeddings, tags) "
+        "VALUES ('ghi', 'C', 'z', '2025-01-03 10:00:00', ?, 't')", (b'z',)
     )
     db.commit_to_database()
 
@@ -107,5 +108,5 @@ def test_get_notes_since_last_sync():
     result = repo.get_notes_since_last_sync("2025-01-02 00:00:00")
 
     # Expect notes B and C (id 2 and 3)
-    ids = [row[0] for row in result]
-    assert ids == [2, 3]
+    ids = [row['uuid'] for row in result]
+    assert ids == ['def', 'ghi']
