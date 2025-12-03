@@ -15,7 +15,7 @@ class SearchEngine:
             logging.error(f"Could not index node with ID {note_id} because it does not exist.")
             return
 
-        note_text = f"{note[1]} {note[2]} {note[5]}" # Merge title, body, and tags.
+        note_text = f"{note['title']} {note['contents']} {note['tags']}"
         tokens = self.tokenizer.tokenize(note_text)
         token_count = self.tokenizer.count(tokens)
         
