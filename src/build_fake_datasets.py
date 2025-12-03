@@ -28,6 +28,8 @@ def build_fake_database(notes_repository, number_of_notes):
 
 if __name__ == "__main__":
 
+    # This scritp takes over half an hour to run on a core-i7 laptop.
+
     db = Database("ten_thousand_notes.db")
 
     nr = NotesRepository(db)
