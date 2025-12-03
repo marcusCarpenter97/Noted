@@ -1,0 +1,12 @@
+[
+  {
+    "uuid": "67f5de82-2bcc-481e-9bca-6b18761c7051",
+    "title": "Remote title",
+    "contents": "Updated remotely",
+    "created_at": "2025-02-01 12:00:00",
+    "last_updated": "2025-02-10 21:00:00",
+    "embeddings": "zczMPc3MTD6amZk+",
+    "tags": "tag1",
+    "deleted": false
+  }
+]
