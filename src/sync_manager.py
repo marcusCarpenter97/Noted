@@ -75,14 +75,14 @@ class SyncManager:
                     logging.info(f"Succesfully updated note with id: {remote_note['uuid']}")
                     self.update_last_sync()
 
-                # If the remote is marked as deleted, delete locally.
-                if remote_note['deleted']:
-                    # If both deleted, do nothing.
-                    if local_note['deleted'] == 1:
-                        continue
-                    self.notes_repo.mark_note_as_deleted(remote_note['uuid'])
-                    logging.info(f"Marked note for deletion with id: {remote_note['uuid']}")
-                    self.update_last_sync()
+                    # If the remote is marked as deleted, delete locally.
+                    if remote_note['deleted']:
+                        # If both deleted, do nothing.
+                        if local_note['deleted'] == 1:
+                            continue
+                        self.notes_repo.mark_note_as_deleted(remote_note['uuid'])
+                        logging.info(f"Marked note for deletion with id: {remote_note['uuid']}")
+                        self.update_last_sync()
 
     def sync(self):
         self.sync_up()
