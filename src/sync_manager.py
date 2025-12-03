@@ -13,6 +13,12 @@ class SyncManager:
         self.notes_repo = notes_repository
         self.api_client = api_client
 
+    def update_last_sync(self):
+        current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        d = {"last_sync": current_timestamp}
+        with open(self.sync_file, 'w') as f:
+            json.dump(d, f)
+
     def get_last_sync(self, sync_file=sync_file, default_last_sync="1970-01-01 00:00:00"):
         try:
             with open(sync_file) as f:
@@ -53,6 +59,7 @@ class SyncManager:
                                             remote_note['contents'], remote_note['created_at'],
                                             remote_note['last_updated'], remote_note['embeddings'], remote_note['tags'])
                 logging.info(f"Inserted note from remote with id: {remote_note['uuid']}")
+                self.update_last_sync()
             else:
                 remote_update_timestamp = remote_note['last_updated']
                 remote_update_timestamp = datetime.strptime(remote_update_timestamp, "%Y-%m-%d %H:%M:%S")
@@ -66,6 +73,7 @@ class SyncManager:
                                                 remote_note['title'], remote_note['contents'], remote_note['embeddings'],
                                                 remote_note['tags'])
                     logging.info(f"Succesfully updated note with id: {remote_note['uuid']}")
+                    self.update_last_sync()
 
                 # If the remote is marked as deleted, delete locally.
                 if remote_note['deleted']:
@@ -74,11 +82,7 @@ class SyncManager:
                         continue
                     self.notes_repo.mark_note_as_deleted(remote_note['uuid'])
                     logging.info(f"Marked note for deletion with id: {remote_note['uuid']}")
-
-        current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        d = {"last_sync": current_timestamp}
-        with open(self.sync_file, 'w') as f:
-            json.dump(d, f)
+                    self.update_last_sync()
 
     def sync(self):
         self.sync_up()
