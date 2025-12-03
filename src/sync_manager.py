@@ -49,12 +49,9 @@ class SyncManager:
 
             # Create note if it does not exist.
             if local_note is None:
-                # TODO Will this cause a conflict because the note has already
-                # been created with an id and now it is being recreated with a
-                # new id? Is this fixed with uuids?
-                local_note_id = self.notes_repo.insert_note(remote_note['uuid'], remote_note['title'],
-                                                            remote_note['contents'], remote_note['created_at'],
-                                                            remote_note['last_updated'], remote_note['embeddings'], remote_note['tags'])
+                self.notes_repo.insert_note(remote_note['uuid'], remote_note['title'],
+                                            remote_note['contents'], remote_note['created_at'],
+                                            remote_note['last_updated'], remote_note['embeddings'], remote_note['tags'])
                 logging.info(f"Inserted note from remote with id: {remote_note['uuid']}")
             else:
                 remote_update_timestamp = remote_note['last_updated']
