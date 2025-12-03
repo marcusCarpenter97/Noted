@@ -24,6 +24,11 @@ class NotesRepository:
         self.db.commit_to_database()
         return unique_id
 
+    def insert_note(self, uuid, title, contents, created_at, last_updated, embeddings, tags):
+        cursor = self.db.get_database_cursor()
+        cursor.execute("INSERT INTO notes (uuid, title, contents, created_at, last_updated, embeddings, tags) VALUES(?, ?, ?, ?, ?, ?, ?)", (uuid, title, contents, created_at, last_updated, embeddings, tags))
+        self.db.commit_to_database()
+
     def get_note(self, note_id):
         cursor = self.db.get_database_cursor()
         cursor.execute("SELECT * FROM notes WHERE uuid=(?)", (note_id,))
