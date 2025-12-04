@@ -1,3 +1,4 @@
 numpy
 pytest
 wonderwords
+faiss-cpu
