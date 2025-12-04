@@ -21,7 +21,8 @@ def test_index_note():
     db = Database(":memory:") 
 
     li = LexicalIndex(db)
-    nr = NotesRepository(db, li)
+    li.create_lexical_table()
+    nr = NotesRepository(db)
     nr.create_notes_table()
 
     fake_embedding = np.array([0.123, 0.69, 0.93]).astype('float32').tobytes()
@@ -31,7 +32,7 @@ def test_index_note():
     ni.create_word_index_table()
     
     tok = Tokenizer()
-    se = SearchEngine(nr, ni, tok)
+    se = SearchEngine(nr, ni, li, tok)
 
     se.index_note(note_id)
 
@@ -42,7 +43,8 @@ def test_query_on_10k_notes():
     db = Database("ten_thousand_notes.db")
 
     li = LexicalIndex(db)
-    nr = NotesRepository(db, li)
+    li.create_lexical_table()
+    nr = NotesRepository(db)
 
     # Query one thousand random notes from the database.
     random_note_ids = random.sample(range(1, 10000), 1000)
@@ -61,12 +63,13 @@ def test_index_note_on_1k_notes():
     db = Database("one_thousand_notes.db")
 
     li = LexicalIndex(db)
-    nr = NotesRepository(db, li)
+    li.create_lexical_table()
+    nr = NotesRepository(db)
     ni = NoteIndex(db)
     ni.create_word_index_table()
     tk = Tokenizer()
 
-    se = SearchEngine(nr, ni, tk)
+    se = SearchEngine(nr, ni, li, tk)
 
     start = time.perf_counter()
 
@@ -75,16 +78,17 @@ def test_index_note_on_1k_notes():
 
     end = time.perf_counter()
 
-    assert (end-start) < 10  # TODO Can you lower this to 1 second?
+    assert (end-start) < 1
 
 def make_engine():
     notes_repo = Mock()
     notes_index = Mock()
+    lexical_index = Mock()
     tokenizer = Mock()
-    return SearchEngine(notes_repo, notes_index, tokenizer), notes_repo, notes_index, tokenizer
+    return SearchEngine(notes_repo, notes_index, lexical_index, tokenizer), notes_repo, notes_index, lexical_index, tokenizer
 
 def test_search_returns_sorted_results():
-    engine, repo, index, tokenizer = make_engine()
+    engine, repo, index, l_index, tokenizer = make_engine()
 
     tokenizer.tokenize.return_value = ["hello", "world"]
 
@@ -102,7 +106,7 @@ def test_search_returns_sorted_results():
     ]
 
 def test_search_empty_results_when_no_matches():
-    engine, repo, index, tokenizer = make_engine()
+    engine, repo, index, l_index, tokenizer = make_engine()
 
     tokenizer.tokenize.return_value = ["nothing"]
 
@@ -113,7 +117,7 @@ def test_search_empty_results_when_no_matches():
     assert result == []
 
 def test_search_calls_retrieve_similar_tokens_per_token():
-    engine, repo, index, tokenizer = make_engine()
+    engine, repo, index, l_index, tokenizer = make_engine()
 
     tokenizer.tokenize.return_value = ["a", "b"]
 
@@ -126,7 +130,7 @@ def test_search_calls_retrieve_similar_tokens_per_token():
     index.retrieve_similar_tokens.assert_any_call("b")
 
 def test_search_accumulates_scores_correctly():
-    engine, repo, index, tokenizer = make_engine()
+    engine, repo, index, l_index, tokenizer = make_engine()
 
     tokenizer.tokenize.return_value = ["dog", "dog"]  # duplicate token
 
@@ -138,7 +142,7 @@ def test_search_accumulates_scores_correctly():
     assert result == [(10, 4)]
 
 def test_search_tokenizes_query_once():
-    engine, repo, index, tokenizer = make_engine()
+    engine, repo, index, l_index, tokenizer = make_engine()
 
     tokenizer.tokenize.return_value = []
 
