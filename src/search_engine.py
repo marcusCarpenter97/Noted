@@ -1,4 +1,5 @@
 import math
+import ollama
 import logging
 from collections import defaultdict
 from notes_repository import NotesRepository
@@ -82,6 +83,15 @@ class SearchEngine:
         final_result = list(bm25_scores.items())
         return sorted(final_result, key=lambda x: x[1], reverse=True)
 
-    def semantic_search(self, user_query):
-        # Use local ANN to create embeddings for user_query.
-        pass
+    def semantic_search(self, user_query, neighbours=100):
+
+        responce = ollama.embedding(model="nomic-embed-text", prompt=user_query)
+        embeddings = responce['embedding']
+
+        distances, indices = self.embedding_database.search(embeddings, neighbours)
+
+        uuids = [faiss_to_uuid[index] for index in indeices]
+
+        results = [(uuid, distance) for uuid, ditance in zip(uuids, distances)]
+
+        return sorted(results, key=lambda x: x[1], reverse=True)

@@ -2,3 +2,4 @@ numpy
 pytest
 wonderwords
 faiss-cpu
+ollama
