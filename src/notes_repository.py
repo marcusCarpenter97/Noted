@@ -1,9 +1,8 @@
 import uuid
 
 class NotesRepository:
-    def __init__(self, db, li):
+    def __init__(self, db):
         self.db = db
-        self.lexical_index = li
 
     def create_notes_table(self):
         cursor = self.db.get_database_cursor()
@@ -22,7 +21,6 @@ class NotesRepository:
         unique_id = str(uuid.uuid4())
         cursor.execute("INSERT INTO notes (uuid, title, contents, created_at, last_updated, embeddings, tags) VALUES(?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?)", (unique_id, title, contents, embeddings, tags))
         self.db.commit_to_database()
-        self.lexical_index.index_note_for_lexical_search(uuid, title, contents)
         return unique_id
 
     def insert_note(self, uuid, title, contents, created_at, last_updated, embeddings, tags):
@@ -34,6 +32,11 @@ class NotesRepository:
         cursor = self.db.get_database_cursor()
         cursor.execute("SELECT * FROM notes WHERE uuid=(?)", (note_id,))
         return cursor.fetchone()
+
+    def get_number_of_non_deleted_notes(self):
+        cursor = self.db.get_database_cursor()
+        cursor.execute("SELECT COUNT(*) FROM notes WHERE deleted = 0")
+        return cursor.fetchone()[0]
 
     def list_all_notes(self, include_deleted=False):
         cursor = self.db.get_database_cursor()
