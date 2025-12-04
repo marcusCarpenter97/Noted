@@ -34,6 +34,16 @@ class NoteIndex:
         cursor.execute("SELECT note_id, count FROM tokens WHERE token = ?", (token,))
         return cursor.fetchall()
 
+    def retrieve_agerage_document_length(self):
+        cursor = self.db.get_database_cursor()
+        cursor.execute("SELECT AVG(doc_len) FROM (SELECT SUM(count) AS doc_len FROM tokens GROUP BY note_id)")
+        return cursor.fetchone()[0]
+
+    def retrieve_term_frequency_in_document(self, note_id, token):
+        cursor = self.db.get_database_cursor()
+        cursor.execute("SELECT count FROM tokens WHERE note_id = ? AND token = ?", (note_id, token))
+        return cursor.fetchone()[0]
+
     def delete_tokens_for_note(self, note_id):
         cursor = self.db.get_database_cursor()
         cursor.execute("DELETE FROM tokens WHERE note_id = ?", (note_id,))
