@@ -7,8 +7,7 @@ from lexical_index import LexicalIndex
 
 def test_sync_down_creates_new_note():
     db = Database(":memory:")
-    li = LexicalIndex(db)
-    repo = NotesRepository(db, li)
+    repo = NotesRepository(db)
     repo.create_notes_table()
 
     fake_remote_note = {
