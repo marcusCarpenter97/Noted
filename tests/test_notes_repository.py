@@ -11,8 +11,7 @@ def reset_db():
 
 def test_create_note():
     db = Database(":memory:")
-    li = LexicalIndex(db)
-    notes_db = NotesRepository(db, li)
+    notes_db = NotesRepository(db)
     notes_db.create_notes_table()
 
     fake_embedding = np.array([0.123, 0.69, 0.93]).astype('float32').tobytes()
@@ -24,15 +23,13 @@ def test_create_note():
 
 def test_get_note_not_found():
     db = Database(":memory:")
-    li = LexicalIndex(db)
-    notes_db = NotesRepository(db, li)
+    notes_db = NotesRepository(db)
     notes_db.create_notes_table()
     assert notes_db.get_note(0) is None
 
 def test_get_note_deleted_note_is_still_returned():
     db = Database(":memory:")
-    li = LexicalIndex(db)
-    notes_db = NotesRepository(db, li)
+    notes_db = NotesRepository(db)
     notes_db.create_notes_table()
     fake_embedding = np.array([0.123, 0.69, 0.93]).astype('float32').tobytes()
     note_id = notes_db.create_note("Title", "Body", fake_embedding, "tag1")
@@ -43,8 +40,7 @@ def test_get_note_deleted_note_is_still_returned():
 
 def test_list_all_notes_with_deleted():
     db = Database(":memory:")
-    li = LexicalIndex(db)
-    notes_db = NotesRepository(db, li)
+    notes_db = NotesRepository(db)
     notes_db.create_notes_table()
     fake_embedding = np.array([0.123, 0.69, 0.93]).astype('float32').tobytes()
     note_id = notes_db.create_note("Title", "Body", fake_embedding, "tag1")
@@ -55,8 +51,7 @@ def test_list_all_notes_with_deleted():
 
 def test_list_all_notes_without_deleted():
     db = Database(":memory:")
-    li = LexicalIndex(db)
-    notes_db = NotesRepository(db, li)
+    notes_db = NotesRepository(db)
     notes_db.create_notes_table()
     fake_embedding = np.array([0.123, 0.69, 0.93]).astype('float32').tobytes()
     note_id = notes_db.create_note("Title", "Body", fake_embedding, "tag1")
@@ -67,8 +62,7 @@ def test_list_all_notes_without_deleted():
 
 def test_mark_note_as_deleted_sets_flag():
     db = Database(":memory:")
-    li = LexicalIndex(db)
-    notes_db = NotesRepository(db, li)
+    notes_db = NotesRepository(db)
     notes_db.create_notes_table()
     fake_embedding = np.array([0.123, 0.69, 0.93]).astype('float32').tobytes()
     note_id = notes_db.create_note("Title", "Body", fake_embedding, "tag1")
@@ -79,8 +73,7 @@ def test_mark_note_as_deleted_sets_flag():
 
 def test_update_note():
     db = Database(":memory:")
-    li = LexicalIndex(db)
-    notes_db = NotesRepository(db, li)
+    notes_db = NotesRepository(db)
     notes_db.create_notes_table()
     fake_embedding = np.array([0.123, 0.69, 0.93]).astype('float32').tobytes()
     note_id = notes_db.create_note("Title", "Body", fake_embedding, "tag1")
@@ -92,8 +85,7 @@ def test_update_note():
 
 def test_get_notes_since_last_sync():
     db = Database(":memory:")
-    li = LexicalIndex(db)
-    repo = NotesRepository(db, li)
+    repo = NotesRepository(db)
     repo.create_notes_table()
 
     # Insert 3 notes with known timestamps
