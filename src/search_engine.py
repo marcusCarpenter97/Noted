@@ -1,15 +1,15 @@
 import math
 import ollama
 import logging
+import numpy as np
 from collections import defaultdict
-from notes_repository import NotesRepository
-from lexical_index import LexicalIndex
 
 class SearchEngine:
-    def __init__(self, notes_repo, notes_index, lexical_index, tokenizer):
+    def __init__(self, notes_repo, notes_index, lexical_index, faiss_engine, tokenizer):
         self.notes_repo = notes_repo
         self.notes_index = notes_index
         self.lexical_index = lexical_index
+        self.embedding_database = faiss_engine
         self.tokenizer = tokenizer
 
     def index_note(self, note_id):
@@ -19,7 +19,7 @@ class SearchEngine:
             logging.error(f"Could not index node with ID {note_id} because it does not exist.")
             return
 
-        note_text = f"{note['title']} {note['contents']} {note['tags']}"
+        note_text = f"{note['title']} {note['contents']} {note['tags']}"  # TODO should tags be split? They are comma separated.
         tokens = self.tokenizer.tokenize(note_text)
         token_count = self.tokenizer.count(tokens)
         
@@ -83,15 +83,55 @@ class SearchEngine:
         final_result = list(bm25_scores.items())
         return sorted(final_result, key=lambda x: x[1], reverse=True)
 
-    def semantic_search(self, user_query, neighbours=100):
+    def semantic_search(self, user_query, neighbours=10):
 
-        responce = ollama.embedding(model="nomic-embed-text", prompt=user_query)
-        embeddings = responce['embedding']
+        responce = ollama.embeddings(model="nomic-embed-text", prompt=user_query)
+        embeddings = np.array(responce['embedding'])
+        embeddings = embeddings.reshape(1, embeddings.shape[0])
 
         distances, indices = self.embedding_database.search(embeddings, neighbours)
 
-        uuids = [faiss_to_uuid[index] for index in indeices]
+        uuids = [self.embedding_database.faiss_to_uuid[index] for index in indices[0]]
 
-        results = [(uuid, distance) for uuid, ditance in zip(uuids, distances)]
+        results = [(uuid, distance) for uuid, distance in zip(uuids, distances[0])]
 
-        return sorted(results, key=lambda x: x[1], reverse=True)
+        return sorted(results, key=lambda x: x[1])
+
+    def hybrid_search(self, user_query, alpha=0.5):
+        lexical_results = self.lexical_search(user_query)
+        semantic_results = self.semantic_search(user_query)
+
+        def normalize_scores(results):
+            min_score = min(results, key=lambda x: x[1])[1]
+            max_score = max(results, key=lambda x: x[1])[1]
+            normalized_scores = defaultdict(float)
+            for note_id, score in results:
+                normalized_scores[note_id] = (score - min_score) / (max_score - min_score)
+            return normalized_scores
+
+        normalized_lexical_scores = normalize_scores(lexical_results)
+        normalized_semantic_scores = normalize_scores(semantic_results)
+
+        all_note_ids = []
+        for note_id, _ in lexical_results:
+            all_note_ids.append(note_id)
+
+        for note_id, _ in semantic_results:
+            all_note_ids.append(note_id)
+
+        all_note_ids = set(all_note_ids)
+        combined_scores = {}
+
+        for note_id in all_note_ids:
+            lex_score = normalized_lexical_scores.get(note_id, 0)
+            sem_score = normalized_semantic_scores.get(note_id, 0)
+            combined_scores[note_id] = {"lexical": lex_score, "semantic": sem_score}
+
+        hybrid_scores = []
+        for note_id in combined_scores:
+            lex_score = combined_scores[note_id]["lexical"]
+            sem_score = combined_scores[note_id]["semantic"]
+            hybrid_score = alpha * lex_score + (1-alpha) * sem_score
+            hybrid_scores.append((note_id, hybrid_score))
+
+        return sorted(hybrid_scores, key=lambda x: x[1], reverse=True)
