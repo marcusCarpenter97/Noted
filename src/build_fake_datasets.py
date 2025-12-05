@@ -1,6 +1,7 @@
 import time
 import random
-import numpy as np
+import pickle
+import ollama
 from wonderwords import RandomWord
 from database import Database
 from notes_repository import NotesRepository
@@ -19,18 +20,20 @@ def build_fake_database(notes_repository, number_of_notes):
         title = " ".join([rand_words.word() for _ in range(title_size)])
         body = " ".join([rand_words.word() for _ in range(body_size)])
         tag = " ".join([rand_words.word() for _ in range(tag_size)])
-        fake_embedding = np.array([0.123, 0.69, 0.93]).astype('float32').tobytes()
 
-        return notes_repository.create_note(title, body, fake_embedding, tag)
+        responce = ollama.embeddings(model="nomic-embed-text", prompt=f"{title} {body} {tag}")
+        embeddings = pickle.dumps(responce['embedding'])
+
+        return notes_repository.create_note(title, body, embeddings, tag)
 
     for _ in range(number_of_notes):
         _ = build_a_note()
 
 if __name__ == "__main__":
 
-    # This scritp takes over half an hour to run on a core-i7 laptop.
+    # This scritp takes about an hour to run on a core-i7 laptop.
 
-    db = Database("ten_thousand_notes.db")
+    db = Database("database/ten_thousand_notes.db")
 
     nr = NotesRepository(db)
     nr.create_notes_table()
@@ -43,7 +46,7 @@ if __name__ == "__main__":
     Database._instance = None
     Database._initialized = None
 
-    db = Database("one_thousand_notes.db")
+    db = Database("database/one_thousand_notes.db")
 
     nr = NotesRepository(db)
     nr.create_notes_table()
