@@ -81,23 +81,29 @@ def lexical_index():
 
     return MockLexicalIndex()
 
+@pytest.fixture
+def faiss_engine():
+    class MockFaiss:
+        def __init__(self):
+            pass
+    return MockFaiss()
 
 # -------------------------------------------------------------
 #                    TEST CASES
 # -------------------------------------------------------------
 
-def test_returns_empty_if_no_docs(tokenizer, notes_repo, notes_index, lexical_index):
+def test_returns_empty_if_no_docs(tokenizer, notes_repo, notes_index, faiss_engine, lexical_index):
     # override lexical index to return zero results
     lexical_index.results = {}
 
-    engine = SearchEngine(notes_repo, notes_index, lexical_index, tokenizer)
+    engine = SearchEngine(notes_repo, notes_index, lexical_index, faiss_engine, tokenizer)
     result = engine.lexical_search("foo")
 
     assert result == []
 
 
-def test_bm25_correctly_ranks_documents(tokenizer, notes_repo, notes_index, lexical_index):
-    engine = SearchEngine(notes_repo, notes_index, lexical_index, tokenizer)
+def test_bm25_correctly_ranks_documents(tokenizer, notes_repo, notes_index, faiss_engine, lexical_index):
+    engine = SearchEngine(notes_repo, notes_index, lexical_index, faiss_engine, tokenizer)
     
     # Query: "foo"
     result = engine.lexical_search("foo")
@@ -111,8 +117,8 @@ def test_bm25_correctly_ranks_documents(tokenizer, notes_repo, notes_index, lexi
     assert result[0][1] >= result[1][1]
 
 
-def test_multiple_tokens_accumulate(tokenizer, notes_repo, notes_index, lexical_index):
-    engine = SearchEngine(notes_repo, notes_index, lexical_index, tokenizer)
+def test_multiple_tokens_accumulate(tokenizer, notes_repo, notes_index, faiss_engine, lexical_index):
+    engine = SearchEngine(notes_repo, notes_index, lexical_index, faiss_engine, tokenizer)
 
     # Query containing two tokens that both appear in A
     # foo -> A,B
@@ -127,7 +133,7 @@ def test_multiple_tokens_accumulate(tokenizer, notes_repo, notes_index, lexical_
     assert score_A > score_B
 
 
-def test_idf_computation_is_called_properly(tokenizer, notes_repo, notes_index, lexical_index, monkeypatch):
+def test_idf_computation_is_called_properly(tokenizer, notes_repo, notes_index, faiss_engine, lexical_index, monkeypatch):
     """
     We mock math.log to ensure IDF is being passed the correct numerator/denominator.
     """
@@ -139,7 +145,7 @@ def test_idf_computation_is_called_properly(tokenizer, notes_repo, notes_index, 
 
     monkeypatch.setattr("math.log", fake_log)
 
-    engine = SearchEngine(notes_repo, notes_index, lexical_index, tokenizer)
+    engine = SearchEngine(notes_repo, notes_index, lexical_index, faiss_engine, tokenizer)
     engine.lexical_search("foo")
 
     # total=2 notes, "foo" appears in both (2)

@@ -1,6 +1,8 @@
 import time
 import pytest
 import random
+import ollama
+import pickle
 import numpy as np
 from unittest.mock import Mock
 from notes_repository import NotesRepository
@@ -8,6 +10,7 @@ from lexical_index import LexicalIndex
 from search_engine import SearchEngine
 from note_index import NoteIndex
 from tokenizer import Tokenizer
+from faiss_engine import Faiss
 from database import Database
 
 random.seed(0)
@@ -25,14 +28,17 @@ def test_index_note():
     nr = NotesRepository(db)
     nr.create_notes_table()
 
-    fake_embedding = np.array([0.123, 0.69, 0.93]).astype('float32').tobytes()
-    note_id = nr.create_note("Title", "Body", fake_embedding, "tag1")
+    responce = ollama.embeddings(model="nomic-embed-text", prompt="dimension probe")
+    embeddings = pickle.dumps(responce['embedding'])
+    note_id = nr.create_note("Title", "Body", embeddings, "tag1")
 
     ni = NoteIndex(db)
     ni.create_word_index_table()
+
+    fe = Faiss(nr)
     
     tok = Tokenizer()
-    se = SearchEngine(nr, ni, li, tok)
+    se = SearchEngine(nr, ni, li, fe, tok)
 
     se.index_note(note_id)
 
@@ -40,7 +46,7 @@ def test_index_note():
     assert len(tokens) == 3  # Three words in the test data.
 
 def test_query_on_10k_notes():
-    db = Database("ten_thousand_notes.db")
+    db = Database("database/ten_thousand_notes.db")
 
     li = LexicalIndex(db)
     li.create_lexical_table()
@@ -60,7 +66,7 @@ def test_query_on_10k_notes():
     assert ((end-start)/1000) <= 0.00002
 
 def test_index_note_on_1k_notes():
-    db = Database("one_thousand_notes.db")
+    db = Database("database/one_thousand_notes.db")
 
     li = LexicalIndex(db)
     li.create_lexical_table()
@@ -69,7 +75,9 @@ def test_index_note_on_1k_notes():
     ni.create_word_index_table()
     tk = Tokenizer()
 
-    se = SearchEngine(nr, ni, li, tk)
+    fe = Faiss(nr)
+
+    se = SearchEngine(nr, ni, li, fe, tk)
 
     start = time.perf_counter()
 
@@ -84,11 +92,12 @@ def make_engine():
     notes_repo = Mock()
     notes_index = Mock()
     lexical_index = Mock()
+    faiss_engine = Mock()
     tokenizer = Mock()
-    return SearchEngine(notes_repo, notes_index, lexical_index, tokenizer), notes_repo, notes_index, lexical_index, tokenizer
+    return SearchEngine(notes_repo, notes_index, lexical_index, faiss_engine, tokenizer), notes_repo, notes_index, lexical_index, faiss_engine, tokenizer
 
 def test_search_returns_sorted_results():
-    engine, repo, index, l_index, tokenizer = make_engine()
+    engine, repo, index, l_index, faiss_engine, tokenizer = make_engine()
 
     tokenizer.tokenize.return_value = ["hello", "world"]
 
@@ -106,7 +115,7 @@ def test_search_returns_sorted_results():
     ]
 
 def test_search_empty_results_when_no_matches():
-    engine, repo, index, l_index, tokenizer = make_engine()
+    engine, repo, index, l_index, faiss_engine, tokenizer = make_engine()
 
     tokenizer.tokenize.return_value = ["nothing"]
 
@@ -117,7 +126,7 @@ def test_search_empty_results_when_no_matches():
     assert result == []
 
 def test_search_calls_retrieve_similar_tokens_per_token():
-    engine, repo, index, l_index, tokenizer = make_engine()
+    engine, repo, index, l_index, faiss_engine, tokenizer = make_engine()
 
     tokenizer.tokenize.return_value = ["a", "b"]
 
@@ -130,7 +139,7 @@ def test_search_calls_retrieve_similar_tokens_per_token():
     index.retrieve_similar_tokens.assert_any_call("b")
 
 def test_search_accumulates_scores_correctly():
-    engine, repo, index, l_index, tokenizer = make_engine()
+    engine, repo, index, l_index, faiss_engine, tokenizer = make_engine()
 
     tokenizer.tokenize.return_value = ["dog", "dog"]  # duplicate token
 
@@ -142,7 +151,7 @@ def test_search_accumulates_scores_correctly():
     assert result == [(10, 4)]
 
 def test_search_tokenizes_query_once():
-    engine, repo, index, l_index, tokenizer = make_engine()
+    engine, repo, index, l_index, faiss_engine, tokenizer = make_engine()
 
     tokenizer.tokenize.return_value = []
 
