@@ -2,7 +2,7 @@ import logging
 import sqlite3
 import numpy as np
 
-DATABASE_NAME = 'database.db'
+DATABASE_PATH = 'database/database.db'
 
 class Database:
     "Implements a database connection to SQLite as a singleton."
@@ -10,7 +10,7 @@ class Database:
     _instance = None
     _initialized = None
 
-    def __new__(cls, database_name=DATABASE_NAME):
+    def __new__(cls, database_name=DATABASE_PATH):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             return cls._instance
@@ -19,7 +19,7 @@ class Database:
             logging.warning(f"Warning: Database already initialized with {cls._instance.name}, ignoring new name {database_name}.")
         return cls._instance
 
-    def __init__(self, database_name=DATABASE_NAME):
+    def __init__(self, database_name=DATABASE_PATH):
         if self._initialized:
             return
 
