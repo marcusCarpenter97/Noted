@@ -87,6 +87,14 @@ class NotesRepository:
         cursor.execute(query, (last_sync,))
         return cursor.fetchall()
 
+    def get_operations_since(self, timestamp):
+        cursor = self.db.get_database_cursor()
+        query = """
+                SELECT * FROM change_log WHERE timestamp > ? ORDER BY timestamp ASC
+                """
+        cursor.execute(query, (timestamp,))
+        return cursor.fetchall()
+
     def mark_note_as_deleted(self, note_id):
         cursor = self.db.get_database_cursor()
         cursor.execute("UPDATE notes SET deleted = 1 WHERE uuid = ?", (note_id,))
