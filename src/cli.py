@@ -2,12 +2,13 @@ import pickle
 import ollama
 import logging
 import numpy as np
-from faiss_engine import Faiss
 from database import Database
+from faiss_engine import Faiss
 from tokenizer import Tokenizer
 from note_index import NoteIndex
 from search_engine import SearchEngine
 from lexical_index import LexicalIndex
+from change_log_repository import ChangeLog
 from notes_repository import NotesRepository
 
 def print_note(note):
@@ -38,6 +39,8 @@ def main(db):
     lexical_index = LexicalIndex(db)
     lexical_index.create_lexical_table()
 
+    change_log = ChangeLog(db)
+
     faiss_engine = Faiss(notes_db)
 
     tokenizer = Tokenizer()
@@ -64,6 +67,10 @@ def main(db):
             search_engine.index_note(note_id)
             lexical_index.index_note_for_lexical_search(note_id, title, contents)
             faiss_engine.add_embedding(note_id, responce['embedding'])
+
+            note_as_json = {"title": title, "contants": contents, "embeddings": embeddings, "tags": tags}
+
+            change_log.log_operation(note_id, "create", note_as_json)
             print(f"You succesfully entered a note with an ID of {note_id}")
 
         elif user_choice == '2':
@@ -89,6 +96,16 @@ def main(db):
 
             old_note = notes_db.get_note(note_id)
 
+            change_as_json = {}
+            # Build the change log with only what's changed.
+            if title is not None:
+                change_as_json['title'] = title
+            if contents is not None:
+                change_as_json['contants'] = contents
+            if tags is not None:
+                change_as_json['tags'] = tags
+
+            # Build the note merging old and new contents.
             if title is None:
                 title = old_note['title']
             if contents is None:
@@ -105,14 +122,18 @@ def main(db):
 
             faiss_engine.update_embedding(note_id, responce['embedding'])
 
+            change_as_json['embeddings'] = embeggings
+            change_log.log_operation(note_id, "update", change_as_json)
+
             print("Note updated.")
-            
+
         elif user_choice == '4':
             note_id = input("Enter ID of note to delete: ")
             notes_db.mark_note_as_deleted(note_id)
             lexical_index.delete_note_from_lexical_search(note_id)
             search_engine.remove_from_index(note_id)
             faiss_engine.delete_embedding(note_id)
+            change_log.log_operation(note_id, "delete", {"deleted": 1})
             print(f"Note {note_id} marked as deleted.")
 
         elif user_choice == '5':

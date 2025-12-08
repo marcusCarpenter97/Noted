@@ -37,3 +37,20 @@ class Database:
     def close_database_connection(self):
         self.connection.close()
 
+    def get_or_create_peer_id(self):
+        cursor = self.get_database_cursor()
+        cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS settings(
+                            key TEXT PRIMARY KEY,
+                            value TEXT)""")
+        cursor.execute("SELECT value FROM settings WHERE key='peer_id'")
+        row = cursor.fetchone()
+
+        if row:
+            return row[0]
+
+        peer_id = str(uuid.uuid4())
+        cursor.execute("INSERT INTO settings (key, value) VALUES (?, ?)", ("peer_id", peer_id))
+        self.commit_to_database()
+
+        return peer_id
