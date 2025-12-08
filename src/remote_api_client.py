@@ -9,6 +9,6 @@ class RemoteAPIClient:
         with open(self.fixtures_dir / "pull_response.json") as f:
             return json.load(f)
 
-    def push_changes(self, notes: list[dict]) -> dict:
+    def push_changes(self, operations: list[dict]) -> dict:
         with open(self.fixtures_dir / "push_response.json") as f:
             return json.load(f)

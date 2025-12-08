@@ -30,7 +30,7 @@ class SyncManager:
     def sync_up(self):
         """ Send new changes to the server. """
         last_sync_at = self.get_last_sync()
-        notes = self.notes_repo.get_notes_since_last_sync(last_sync_at["last_sync"])
+        notes = self.notes_repo.get_operations_since(last_sync_at["last_sync"])
 
         try:
             result = self.api_client.push_changes(notes)
@@ -40,7 +40,7 @@ class SyncManager:
 
         logging.info(result)
 
-    def sync_down(self):
+    def sync_down(self):  # TODO this needs updating.
         """ Pull new changes from the server. """
         last_sync_at = self.get_last_sync()
 
