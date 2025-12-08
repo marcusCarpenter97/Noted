@@ -11,23 +11,29 @@ def test_sync_down_creates_new_note():
     repo.create_notes_table()
 
     fake_remote_note = {
-        "uuid": "28624697-db0b-4252-a904-8de04ea772e7",
-        "title": "Hello",
-        "contents": "World",
-        "embeddings": "zczMPc3MTD6amZk+",
-        "tags": "tag",
-        "created_at": "2025-01-01T12:00:00Z",
-        "last_updated": "2025-01-01T12:00:00Z",
-        "deleted": False
+        "op_id": "49bc3c9c-f0ee-4fdf-bb94-52cc7d1d68a6",
+        "uuid": "67f5de82-2bcc-481e-9bca-6b18761c7051",
+        "operation_type": "create",
+        "timestamp": "2025-02-01 12:00:00",
+        "device_id": "6dfb9091-831c-45db-b130-a60d6b8a05a8",
+        "payload": {
+            "title": "Remote title",
+            "contents": "Updated remotely",
+            "created_at": "2025-02-01 12:00:00",
+            "last_updated": "2025-02-10 21:00:00",
+            "embeddings": "zczMPc3MTD6amZk+",
+            "tags": "tag1",
+            "deleted": 0 
+        }
     }
 
     client = Mock()
     client.pull_changes.return_value = [fake_remote_note]
 
-    sm = SyncManager(repo, client)
+    sm = SyncManager(db, repo, client)
 
     sm.sync_down()
 
-    saved = repo.get_note("28624697-db0b-4252-a904-8de04ea772e7")
+    saved = repo.get_note("67f5de82-2bcc-481e-9bca-6b18761c7051")
     assert saved is not None
-    assert saved[1] == "Hello"
+    assert saved[1] == "Remote title"

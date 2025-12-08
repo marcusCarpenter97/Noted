@@ -2,35 +2,45 @@ import json
 import logging
 from datetime import datetime
 from database import Database
+from change_log_repository import ChangeLog
 from notes_repository import NotesRepository
 from remote_api_client import RemoteAPIClient
 
 class SyncManager:
 
-    sync_file = "last_sync_at.json"
-
-    def __init__(self, notes_repository, api_client):
+    def __init__(self, db, notes_repository, api_client):
+        self.db = db
         self.notes_repo = notes_repository
         self.api_client = api_client
+        self.create_last_sync_table()
+        self.initialize_sync_table()
+
+    def create_last_sync_table(self):
+        cursor = self.db.get_database_cursor()
+        cursor.execute("""CREATE TABLE IF NOT EXISTS last_sync (
+                            id INTEGER PRIMARY KEY CHECK (id = 1) DEFAULT 1,
+                            last_updated DATETIME)""")
+
+    def initialize_sync_table(self):
+        # Insert if empty.
+        cursor = self.db.get_database_cursor()
+        cursor.execute("""INSERT INTO last_sync (last_updated) SELECT CURRENT_TIMESTAMP WHERE NOT EXISTS (SELECT * FROM last_sync)""")
+        self.db.commit_to_database()
 
     def update_last_sync(self):
-        current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        d = {"last_sync": current_timestamp}
-        with open(self.sync_file, 'w') as f:
-            json.dump(d, f)
+        cursor = self.db.get_database_cursor()
+        cursor.execute("UPDATE last_sync SET last_updated = CURRENT_TIMESTAMP WHERE id = 1")
+        self.db.commit_to_database()
 
-    def get_last_sync(self, sync_file=sync_file, default_last_sync="1970-01-01 00:00:00"):
-        try:
-            with open(sync_file) as f:
-                return json.load(f)
-        except FileNotFoundError as e:
-            logging.warning(e)
-            return {"last_sync": default_last_sync}
+    def get_last_sync(self):
+        cursor = self.db.get_database_cursor()
+        cursor.execute("SELECT last_updated FROM last_sync WHERE id = 1")
+        return cursor.fetchone()[0]
 
     def sync_up(self):
         """ Send new changes to the server. """
         last_sync_at = self.get_last_sync()
-        notes = self.notes_repo.get_operations_since(last_sync_at["last_sync"])
+        notes = self.notes_repo.get_operations_since(last_sync_at)
 
         try:
             result = self.api_client.push_changes(notes)
@@ -40,49 +50,48 @@ class SyncManager:
 
         logging.info(result)
 
-    def sync_down(self):  # TODO this needs updating.
+    def sync_down(self):
         """ Pull new changes from the server. """
         last_sync_at = self.get_last_sync()
 
         try:
-            result = self.api_client.pull_changes(last_sync_at["last_sync"])
+            result = self.api_client.pull_changes(last_sync_at)
         except Exception as e:
             logging.error(f"Failed to pull changes: %s", e)
             return
 
-        for remote_note in result:
-            local_note = self.notes_repo.get_note(remote_note['uuid'])
+        for remote_operation in result:
+            local_note = self.notes_repo.get_note(remote_operation['uuid'])
 
-            # Create note if it does not exist.
-            if local_note is None:
-                self.notes_repo.insert_note(remote_note['uuid'], remote_note['title'],
-                                            remote_note['contents'], remote_note['created_at'],
-                                            remote_note['last_updated'], remote_note['embeddings'], remote_note['tags'])
-                logging.info(f"Inserted note from remote with id: {remote_note['uuid']}")
-                self.update_last_sync()
-            else:
-                remote_update_timestamp = remote_note['last_updated']
-                remote_update_timestamp = datetime.strptime(remote_update_timestamp, "%Y-%m-%d %H:%M:%S")
-                local_update_timestamp = datetime.strptime(local_note['last_updated'], "%Y-%m-%d %H:%M:%S")
-
-                # If remote is older than local version, keep local therefore
-                # there is nothing required to do. However, if remote is newer
-                # than local version, keep remote.
-                if remote_update_timestamp > local_update_timestamp:
-                    self.notes_repo.update_note(remote_note['uuid'],
-                                                remote_note['title'], remote_note['contents'], remote_note['embeddings'],
-                                                remote_note['tags'])
-                    logging.info(f"Succesfully updated note with id: {remote_note['uuid']}")
+            if remote_operation['operation_type'] == 'create':
+                if local_note is None:
+                    self.notes_repo.insert_note(remote_operation['uuid'], remote_operation['payload']['title'],
+                                                remote_operation['payload']['contents'], remote_operation['payload']['created_at'],
+                                                remote_operation['payload']['last_updated'],
+                                                remote_operation['payload']['embeddings'], remote_operation['payload']['tags'])
+                    logging.info(f"Inserted note from remote with id: {remote_operation['uuid']}")
                     self.update_last_sync()
+                else:
+                    logging.warning(f"Could not create note because a note with this id already exists. Note id : {remote_operation['uuid']}")
 
-                    # If the remote is marked as deleted, delete locally.
-                    if remote_note['deleted']:
-                        # If both deleted, do nothing.
-                        if local_note['deleted'] == 1:
-                            continue
-                        self.notes_repo.mark_note_as_deleted(remote_note['uuid'])
-                        logging.info(f"Marked note for deletion with id: {remote_note['uuid']}")
-                        self.update_last_sync()
+            if remote_operation['operation_type'] == 'update':
+                if local_note is not None:  # Use .get bacause parameters may not exist in update function.
+                    self.notes_repo.update_note(remote_operation['uuid'],
+                                                remote_operation['payload'].get('title', None), remote_operation['payload'].get('contents', None),
+                                                remote_operation['payload'].get('embeddings', None),
+                                                remote_operation['payload'].get('tags', None))
+                    logging.info(f"Succesfully updated note with id: {remote_operation['uuid']}")
+                    self.update_last_sync()
+                else:
+                    logging.warning(f"Could not update note becuase a note with this id does not exist. Note id : {remote_operation['uuid']}")
+
+            if remote_operation['operation_type'] == 'delete':
+                if local_note is not None:
+                    self.notes_repo.mark_note_as_deleted(remote_operation['uuid'])
+                    logging.info(f"Marked note for deletion with id: {remote_operation['uuid']}")
+                    self.update_last_sync()
+                else:
+                    logging.warning(f"Could not delete note becuase a note with this id does not exist. Note id : {remote_operation['uuid']}")
 
     def sync(self):
         self.sync_up()
@@ -100,8 +109,10 @@ if __name__ == "__main__":
     )
 
     db = Database()
+    cl = ChangeLog(db)
+    cl.create_change_log_table()
     nr = NotesRepository(db)
     nr.create_notes_table()
     rc = RemoteAPIClient()
-    sm = SyncManager(nr, rc)
+    sm = SyncManager(db, nr, rc)
     sm.sync()
