@@ -91,15 +91,31 @@ class SearchEngine:
 
         distances, indices = self.embedding_database.search(embeddings, neighbours)
 
-        uuids = [self.embedding_database.faiss_to_uuid[index] for index in indices[0]]
+        distances = distances.flatten()
+        indices = indices.flatten()
 
-        results = [(uuid, distance) for uuid, distance in zip(uuids, distances[0])]
+        if not self.embedding_database.faiss_to_uuid:
+            logging.warning("Semantic database is empty. Could not search semanticaly.")
+            return
+
+        if any(x == -1 for x in indices):
+            positions = [i for i in enumerate(indices) if indices[i] == -1]
+            indices = np.delete(indices, positions)
+            distances = np.delete(distances, positions)
+
+        uuids = [self.embedding_database.faiss_to_uuid[index] for index in indices]
+
+        results = [(uuid, distance) for uuid, distance in zip(uuids, distances)]
 
         return sorted(results, key=lambda x: x[1])
 
     def hybrid_search(self, user_query, alpha=0.5):
         lexical_results = self.lexical_search(user_query)
         semantic_results = self.semantic_search(user_query)
+
+        if not lexical_results or semantic_results is None:
+            logging.warning("Could not perform hybid search, database is empty.")
+            return
 
         def normalize_scores(results):
             min_score = min(results, key=lambda x: x[1])[1]
