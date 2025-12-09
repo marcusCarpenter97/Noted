@@ -8,6 +8,7 @@ from tokenizer import Tokenizer
 from note_index import NoteIndex
 from search_engine import SearchEngine
 from lexical_index import LexicalIndex
+from device_identification import DeviceID
 from change_log_repository import ChangeLog
 from notes_repository import NotesRepository
 
@@ -29,6 +30,10 @@ def main(db):
     logging.basicConfig(filename="noted.log",
                         level=logging.INFO,
                         format="%(asctime)s - %(levelname)s - %(message)s")
+
+    device = DeviceID(db)
+    device_id = device.get_or_generate_device_id()
+    private_key, public_key = device.get_or_generate_public_private_keys()
 
     notes_db = NotesRepository(db)
     notes_db.create_notes_table()
@@ -78,8 +83,13 @@ def main(db):
 
             top_results = search_engine.hybrid_search(search_params)
 
+            if top_results is None:
+                print("Database is empty, could not search.")
+                continue
+
             if len(top_results) == 0:
                 print("No search results found.")
+                continue
 
             for res in top_results:
                 note = notes_db.get_note(res[0])
