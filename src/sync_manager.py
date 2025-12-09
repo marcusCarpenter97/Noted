@@ -37,13 +37,15 @@ class SyncManager:
         cursor.execute("SELECT last_updated FROM last_sync WHERE id = 1")
         return cursor.fetchone()[0]
 
-    def sync_up(self):
+    def sync_up(self, batch_size=50):
         """ Send new changes to the server. """
         last_sync_at = self.get_last_sync()
-        notes = self.notes_repo.get_operations_since(last_sync_at)
+        operations = self.notes_repo.get_operations_since(last_sync_at)
 
         try:
-            result = self.api_client.push_changes(notes)
+            for i in range(0, len(operations), batch_size):
+                batch = operations[i : i + batch_size]
+                result = self.api_client.push_changes(batch)
         except Exception as e:
             logging.error(f"Failed to push changes: %s", e)
             return
@@ -54,7 +56,7 @@ class SyncManager:
         """ Pull new changes from the server. """
         last_sync_at = self.get_last_sync()
 
-        try:
+        try:  # TODO add batching to pull_changes function
             result = self.api_client.pull_changes(last_sync_at)
         except Exception as e:
             logging.error(f"Failed to pull changes: %s", e)
