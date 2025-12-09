@@ -3,3 +3,4 @@ pytest
 wonderwords
 faiss-cpu
 ollama
+PyNaCl
