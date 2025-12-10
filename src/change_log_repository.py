@@ -19,12 +19,15 @@ class ChangeLog:
         self.db.commit_to_database()
 
     def log_operation(self, note_id, operation_type, payload):
+
+        payload.pop("embeddings", None)
+
         cursor = self.db.get_database_cursor()
         op_id = str(uuid.uuid4())
         device_id = self.db.get_or_create_peer_id()
 
         cursor.execute("""
-                INSER INTO chage_log (op_id, note_id, operation_type, timestamp, device_id, payload)
+                INSERT INTO change_log (op_id, note_id, operation_type, timestamp, device_id, payload)
                 VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?)""",
-                (op_id, note_id, operation_type, device_is, json.dumps(payload)))
+                (op_id, note_id, operation_type, device_id, json.dumps(payload)))
         self.db.commit_to_database()
