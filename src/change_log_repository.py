@@ -15,10 +15,12 @@ class ChangeLog:
                             operation_type TEXT,
                             timestamp DATETIME,
                             device_id TEXT,
-                            payload TEXT)""")
+                            payload TEXT,
+                            lamport_clock INTEGER,
+                            origin_device TEXT)""")
         self.db.commit_to_database()
 
-    def log_operation(self, note_id, operation_type, payload):
+    def log_operation(self, note_id, operation_type, payload, lamport_timestamp, origin_device):
 
         payload.pop("embeddings", None)
 
@@ -27,7 +29,7 @@ class ChangeLog:
         device_id = self.db.get_or_create_peer_id()
 
         cursor.execute("""
-                INSERT INTO change_log (op_id, note_id, operation_type, timestamp, device_id, payload)
-                VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?)""",
-                (op_id, note_id, operation_type, device_id, json.dumps(payload)))
+                INSERT INTO change_log (op_id, note_id, operation_type, timestamp, device_id, payload, lamport_clock, origin_device)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?)""",
+                (op_id, note_id, operation_type, device_id, json.dumps(payload), lamport_timestamp, origin_device))
         self.db.commit_to_database()

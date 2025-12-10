@@ -6,6 +6,7 @@ from database import Database
 from faiss_engine import Faiss
 from tokenizer import Tokenizer
 from note_index import NoteIndex
+from lamport_clock import LamportClock
 from search_engine import SearchEngine
 from lexical_index import LexicalIndex
 from device_identification import DeviceID
@@ -34,6 +35,9 @@ def main(db):
     device = DeviceID(db)
     device_id = device.get_or_generate_device_id()
     private_key, public_key = device.get_or_generate_public_private_keys()
+
+    lamport_clock = LamportClock(db)
+    lamport_clock.initialize_lamport_clock()
 
     notes_db = NotesRepository(db)
     notes_db.create_notes_table()
@@ -76,7 +80,8 @@ def main(db):
 
             note_as_json = {"title": title, "contants": contents, "embeddings": embeddings, "tags": tags}
 
-            change_log.log_operation(note_id, "create", note_as_json)
+            lamport_clock.increment_lamport_time()
+            change_log.log_operation(note_id, "create", note_as_json, lamport_clock.lamport_time, device_id)
             print(f"You succesfully entered a note with an ID of {note_id}")
 
         elif user_choice == '2':
@@ -133,8 +138,9 @@ def main(db):
 
             faiss_engine.update_embedding(note_id, responce['embedding'])
 
-            change_as_json['embeddings'] = embeggings
-            change_log.log_operation(note_id, "update", change_as_json)
+            change_as_json['embeddings'] = embeddings
+            lamport_clock.increment_lamport_time()
+            change_log.log_operation(note_id, "update", change_as_json, lamport_clock.lamport_time, device_id)
 
             print("Note updated.")
 
@@ -144,7 +150,8 @@ def main(db):
             lexical_index.delete_note_from_lexical_search(note_id)
             search_engine.remove_from_index(note_id)
             faiss_engine.delete_embedding(note_id)
-            change_log.log_operation(note_id, "delete", {"deleted": 1})
+            lamport_clock.increment_lamport_time()
+            change_log.log_operation(note_id, "delete", {"deleted": 1}, lamport_clock.lamport_time, device_id)
             print(f"Note {note_id} marked as deleted.")
 
         elif user_choice == '5':
