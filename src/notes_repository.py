@@ -1,4 +1,5 @@
 import uuid
+from hashing import compute_note_hash
 
 class NotesRepository:
     def __init__(self, db):
@@ -14,18 +15,21 @@ class NotesRepository:
                         last_updated DATETIME,
                         embeddings BLOB,
                         tags TEXT,
-                        deleted BOOLEAN DEFAULT 0)""")
+                        deleted BOOLEAN DEFAULT 0,
+                        note_hash TEXT)""")
 
     def create_note(self, title, contents, embeddings, tags):
         cursor = self.db.get_database_cursor()
         unique_id = str(uuid.uuid4())
-        cursor.execute("INSERT INTO notes (uuid, title, contents, created_at, last_updated, embeddings, tags) VALUES(?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?)", (unique_id, title, contents, embeddings, tags))
+        note_hash = compute_note_hash(title, contents, tags, embeddings, deleted=0)
+        cursor.execute("INSERT INTO notes (uuid, title, contents, created_at, last_updated, embeddings, tags, note_hash) VALUES(?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, ?)", (unique_id, title, contents, embeddings, tags, note_hash))
         self.db.commit_to_database()
         return unique_id
 
     def insert_note(self, uuid, title, contents, created_at, last_updated, embeddings, tags):
         cursor = self.db.get_database_cursor()
-        cursor.execute("INSERT INTO notes (uuid, title, contents, created_at, last_updated, embeddings, tags) VALUES(?, ?, ?, ?, ?, ?, ?)", (uuid, title, contents, created_at, last_updated, embeddings, tags))
+        note_hash = compute_note_hash(title, contents, tags, embeddings, deleted=0)
+        cursor.execute("INSERT INTO notes (uuid, title, contents, created_at, last_updated, embeddings, tags, note_hash) VALUES(?, ?, ?, ?, ?, ?, ?, ?)", (uuid, title, contents, created_at, last_updated, embeddings, tags, note_hash))
         self.db.commit_to_database()
 
     def get_note(self, note_id):
@@ -50,24 +54,37 @@ class NotesRepository:
     def update_note(self, note_id, title=None, contents=None, embeddings=None, tags=None):
         cursor = self.db.get_database_cursor()
 
+        current_note = self.get_note(note_id)
+        if current_note is None:
+            return None
+
+        _, cur_title, cur_contents, _, _, cur_embeddings, cur_tags, cur_deleted, _, = current_note
+
+        new_title = title if title is not None else cur_title
+        new_contents = contents if contents is not None else cur_contents
+        new_embeddings = embeddings if embeddings is not None else cur_embeddings
+        new_tags = tags if tags is not None else cur_tags
+
+        new_hash = compute_note_hash(new_title, new_contents, new_tags, new_embeddings, cur_deleted)
+
         updates = []
         params = []
 
         if title is not None:
             updates.append("title = ?")
-            params.append(title)
+            params.append(new_title)
 
         if contents is not None:
             updates.append("contents = ?")
-            params.append(contents)
+            params.append(new_contents)
 
         if embeddings is not None:
             updates.append("embeddings = ?")
-            params.append(embeddings)
+            params.append(new_embeddings)
 
         if tags is not None:
             updates.append("tags = ?")
-            params.append(tags)
+            params.append(new_tags)
 
         updates.append("last_updated = CURRENT_TIMESTAMP")
 
@@ -97,5 +114,13 @@ class NotesRepository:
 
     def mark_note_as_deleted(self, note_id):
         cursor = self.db.get_database_cursor()
-        cursor.execute("UPDATE notes SET deleted = 1 WHERE uuid = ?", (note_id,))
+
+        current_note = self.get_note(note_id)
+        if current_note is None:
+            return
+
+        _, title, contents, _, _, embeddings, tags, _, _ = current_note
+
+        new_hash = compute_note_hash(title, contents, tags, embeddings, deleted=1)
+        cursor.execute("UPDATE notes SET deleted = 1, note_hash = ?, last_updated = CURRENT_TIMESTAMP WHERE uuid = ?", (new_hash, note_id))
         self.db.commit_to_database()
