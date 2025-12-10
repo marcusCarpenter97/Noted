@@ -45,6 +45,7 @@ def main(db):
     lexical_index.create_lexical_table()
 
     change_log = ChangeLog(db)
+    change_log.create_change_log_table()
 
     faiss_engine = Faiss(notes_db)
 
