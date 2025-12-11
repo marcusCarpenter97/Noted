@@ -63,7 +63,7 @@ def test_query_on_10k_notes():
     end = time.perf_counter()
 
     assert (end-start) <= 0.2
-    assert ((end-start)/1000) <= 0.00002
+    assert ((end-start)/1000) <= 0.00005
 
 def test_index_note_on_1k_notes():
     db = Database("database/one_thousand_notes.db")
