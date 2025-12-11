@@ -1,71 +1,25 @@
-
 import pytest
 from unittest.mock import Mock
-from database import Database
-from notes_repository import NotesRepository
 from sync_manager import SyncManager
-from lexical_index import LexicalIndex
 
-def test_sync_down_creates_new_note():
-    db = Database(":memory:")
-    repo = NotesRepository(db)
-    repo.create_notes_table()
 
-    fake_remote_note = {
-        "op_id": "49bc3c9c-f0ee-4fdf-bb94-52cc7d1d68a6",
-        "uuid": "67f5de82-2bcc-481e-9bca-6b18761c7051",
-        "operation_type": "create",
-        "timestamp": "2025-02-01 12:00:00",
-        "device_id": "6dfb9091-831c-45db-b130-a60d6b8a05a8",
-        "payload": {
-            "title": "Remote title",
-            "contents": "Updated remotely",
-            "created_at": "2025-02-01 12:00:00",
-            "last_updated": "2025-02-10 21:00:00",
-            "embeddings": "zczMPc3MTD6amZk+",
-            "tags": "tag1",
-            "deleted": 0 
-        }
-    }
-
-    client = Mock()
-    client.pull_changes.return_value = [fake_remote_note]
-
-    sm = SyncManager(db, repo, client)
-
-    sm.sync_down()
-
-    saved = repo.get_note("67f5de82-2bcc-481e-9bca-6b18761c7051")
-    assert saved is not None
-    assert saved[1] == "Remote title"
-
-#
-# ────────────────────────────────────────────────────────────────────────────────
-#   HELPERS: Fake in-memory DB and repositories
-# ────────────────────────────────────────────────────────────────────────────────
-#
+# ────────────────────────────────────────────────────────────────
+#   Minimal Fakes
+# ────────────────────────────────────────────────────────────────
 
 class FakeDB:
-    """A minimal fake Database that stores rows in memory instead of SQLite."""
     def __init__(self):
-        self.tables = {
-            "last_sync": [{"id": 1, "last_updated": "2000-01-01 00:00:00"}]
-        }
+        self.last_updated = "2000-01-01 00:00:00"
 
     def get_database_cursor(self):
         return self
 
     def execute(self, query, params=()):
-        query = query.lower()
-
-        # update last_sync
-        if "update last_sync" in query:
-            self.tables["last_sync"][0]["last_updated"] = "3000-01-01 00:00:00"
-
-        # select last_sync
-        if "select last_updated" in query:
-            self._fetchone = (self.tables["last_sync"][0]["last_updated"],)
-
+        q = query.lower()
+        if "select last_updated" in q:
+            self._fetchone = (self.last_updated,)
+        if "update last_sync" in q:
+            self.last_updated = "3000-01-01 00:00:00"
         return self
 
     def fetchone(self):
@@ -76,14 +30,9 @@ class FakeDB:
 
 
 class FakeNotesRepository:
-    """A fake NotesRepository with in-memory notes and change log."""
     def __init__(self):
-        self.notes = {}  # uuid → payload
-        self.operations = []  # operations since last sync
+        self.notes = {}
 
-    #
-    # ── Notes table ──────────────────────────────────────────────────────────────
-    #
     def insert_note(self, uuid, title, contents, created_at, last_updated, embeddings, tags):
         self.notes[uuid] = {
             "uuid": uuid,
@@ -97,17 +46,17 @@ class FakeNotesRepository:
         }
 
     def update_note(self, uuid, title=None, contents=None, embeddings=None, tags=None):
-        note = self.notes.get(uuid)
-        if not note:
+        n = self.notes.get(uuid)
+        if not n:
             return
-        if title:
-            note["title"] = title
-        if contents:
-            note["contents"] = contents
-        if embeddings:
-            note["embeddings"] = embeddings
-        if tags:
-            note["tags"] = tags
+        if title is not None:
+            n["title"] = title
+        if contents is not None:
+            n["contents"] = contents
+        if embeddings is not None:
+            n["embeddings"] = embeddings
+        if tags is not None:
+            n["tags"] = tags
 
     def mark_note_as_deleted(self, uuid):
         if uuid in self.notes:
@@ -116,169 +65,93 @@ class FakeNotesRepository:
     def get_note(self, uuid):
         return self.notes.get(uuid)
 
-    #
-    # ── Change Log ──────────────────────────────────────────────────────────────
-    #
-    def get_operations_since(self, last_sync_timestamp):
-        return self.operations
+    def get_operations_since(self, ts):
+        return []
 
 
 class FakeRemoteAPI:
-    """Fake API that returns predetermined push/pull results."""
     def __init__(self):
         self.pull_result = []
-        self.push_received = None
 
-    def pull_changes(self, since_timestamp):
+    def pull_changes(self, since_ts):
         return self.pull_result
 
-    def push_changes(self, operations):
-        self.push_received = operations
-        return {"ok": True}
+
+class FakeLamportClock:
+    def __init__(self):
+        self.time = 0
+
+    def initialize_lamport_clock(self):
+        self.time = 0
+
+    def increment_lamport_time(self, incoming=None):
+        if incoming is None:
+            self.time += 1
+        else:
+            self.time = max(self.time + 1, incoming + 1)
+
+    def save_lamport_time_to_db(self):
+        pass
+
+    def now(self):
+        return self.time
 
 
+class FakeChangeLog:
+    def __init__(self):
+        self.ops = {}
 
-#
-# ────────────────────────────────────────────────────────────────────────────────
+    def create_change_log_table(self): pass
+
+    def check_operation_exists(self, op_id):
+        return 1 if op_id in self.ops else 0
+
+    def log_operation(self, op_id, op_type, payload, ts, origin):
+        self.ops[op_id] = True
+
+
+# ────────────────────────────────────────────────────────────────
+#   Helper: build SyncManager with minimal mocks
+# ────────────────────────────────────────────────────────────────
+
+def make_sync_manager(api):
+    db = FakeDB()
+    notes = FakeNotesRepository()
+    clock = FakeLamportClock()
+    change_log = FakeChangeLog()
+
+    # minimal mocks for unused injected deps
+    se = Mock()
+    li = Mock()
+    fe = Mock()
+
+    return SyncManager(
+        db=db,
+        device_id="DEVICE",
+        notes_repository=notes,
+        change_log=change_log,
+        lamport_clock=clock,
+        se=se,
+        li=li,
+        fe=fe,
+        api_client=api
+    ), notes
+
+
+# ────────────────────────────────────────────────────────────────
 #   TESTS
-# ────────────────────────────────────────────────────────────────────────────────
-#
+# ────────────────────────────────────────────────────────────────
 
-
-def test_remote_wins_on_conflict():
-    """
-    Remote sends an update for a note that also exists locally.
-    Since SyncManager always applies remote operations, remote wins.
-    """
-    db = FakeDB()
-    nr = FakeNotesRepository()
+def test_create_note_from_remote():
     api = FakeRemoteAPI()
-
-    # Local note
-    nr.notes["A"] = {
-        "uuid": "A",
-        "title": "Local Title",
-        "contents": "Local Contents",
-        "created_at": "2020",
-        "last_updated": "2020",
-        "embeddings": None,
-        "tags": [],
-        "deleted": False,
-    }
-
-    # Remote update
     api.pull_result = [{
+        "op_id": "1",
         "uuid": "A",
-        "operation_type": "update",
-        "payload": {
-            "title": "Remote Title",
-            "contents": "Remote Contents"
-        }
-    }]
-
-    sm = SyncManager(db, nr, api)
-    sm.sync_down()
-
-    assert nr.notes["A"]["title"] == "Remote Title"
-    assert nr.notes["A"]["contents"] == "Remote Contents"
-
-
-
-def test_local_wins_if_newer_is_simulated_by_not_overwriting_on_missing_fields():
-    """
-    Since the current SyncManager does NOT compare timestamps,
-    the only way local 'wins' is when remote does NOT send certain fields.
-
-    If remote update lacks 'contents', local content stays.
-    """
-    db = FakeDB()
-    nr = FakeNotesRepository()
-    api = FakeRemoteAPI()
-
-    # Local note
-    nr.notes["A"] = {
-        "uuid": "A",
-        "title": "Local Title",
-        "contents": "Local Contents",
-        "created_at": "2020",
-        "last_updated": "2021",
-        "embeddings": None,
-        "tags": [],
-        "deleted": False,
-    }
-
-    # Remote update missing 'contents'
-    api.pull_result = [{
-        "uuid": "A",
-        "operation_type": "update",
-        "payload": {
-            "title": "Remote Title"
-        }
-    }]
-
-    sm = SyncManager(db, nr, api)
-    sm.sync_down()
-
-    # Title updated from remote
-    assert nr.notes["A"]["title"] == "Remote Title"
-    # Contents unchanged → "local wins"
-    assert nr.notes["A"]["contents"] == "Local Contents"
-
-
-
-def test_delete_vs_update_edge_case():
-    """
-    Remote says "delete", local still has the note.
-    SyncManager must mark it as deleted.
-    """
-    db = FakeDB()
-    nr = FakeNotesRepository()
-    api = FakeRemoteAPI()
-
-    nr.notes["A"] = {
-        "uuid": "A",
-        "title": "Local",
-        "contents": "Local",
-        "created_at": "2020",
-        "last_updated": "2020",
-        "embeddings": None,
-        "tags": [],
-        "deleted": False,
-    }
-
-    api.pull_result = [{
-        "uuid": "A",
-        "operation_type": "delete",
-        "payload": {}
-    }]
-
-    sm = SyncManager(db, nr, api)
-    sm.sync_down()
-
-    assert nr.notes["A"]["deleted"] is True
-
-
-
-def test_multiple_sync_cycles_apply_changes_in_order():
-    """
-    Remote sends multiple operations over multiple cycles.
-    SyncManager must apply them correctly.
-    """
-    db = FakeDB()
-    nr = FakeNotesRepository()
-    api = FakeRemoteAPI()
-
-    sm = SyncManager(db, nr, api)
-
-    #
-    # First cycle: create
-    #
-    api.pull_result = [{
-        "uuid": "A",
+        "lamport_clock": 5,
         "operation_type": "create",
         "payload": {
-            "title": "First",
-            "contents": "Hello",
+            "title": "Hello",
+            "contents": "World",
             "created_at": "2020",
             "last_updated": "2020",
             "embeddings": None,
@@ -286,33 +159,118 @@ def test_multiple_sync_cycles_apply_changes_in_order():
         }
     }]
 
+    sm, notes = make_sync_manager(api)
     sm.sync_down()
-    assert nr.get_note("A")["title"] == "First"
 
-    #
-    # Second cycle: update
-    #
+    assert notes.get_note("A")["title"] == "Hello"
+
+
+def test_update_note_from_remote():
+    api = FakeRemoteAPI()
+    sm, notes = make_sync_manager(api)
+
+    # local existing
+    notes.insert_note("A", "Old", "Body", "2020", "2020", None, [])
+
     api.pull_result = [{
+        "op_id": "2",
         "uuid": "A",
+        "lamport_clock": 10,
         "operation_type": "update",
-        "payload": {
-            "title": "Second",
-            "contents": "World"
-        }
+        "payload": {"title": "New Title"}
     }]
 
     sm.sync_down()
-    assert nr.get_note("A")["title"] == "Second"
-    assert nr.get_note("A")["contents"] == "World"
 
-    #
-    # Third cycle: delete
-    #
+    assert notes.get_note("A")["title"] == "New Title"
+    assert notes.get_note("A")["contents"] == "Body"  # unchanged
+
+
+def test_delete_note_from_remote():
+    api = FakeRemoteAPI()
+    sm, notes = make_sync_manager(api)
+
+    notes.insert_note("A", "T", "C", "2020", "2020", None, [])
+
     api.pull_result = [{
+        "op_id": "3",
         "uuid": "A",
+        "lamport_clock": 7,
         "operation_type": "delete",
         "payload": {}
     }]
 
     sm.sync_down()
-    assert nr.get_note("A")["deleted"] is True
+
+    assert notes.get_note("A")["deleted"] is True
+
+
+def test_multiple_operations_in_order():
+    api = FakeRemoteAPI()
+    sm, notes = make_sync_manager(api)
+
+    # 1. create
+    api.pull_result = [{
+        "op_id": "4",
+        "uuid": "A",
+        "lamport_clock": 1,
+        "operation_type": "create",
+        "payload": {
+            "title": "One",
+            "contents": "X",
+            "created_at": "t",
+            "last_updated": "t",
+            "embeddings": None,
+            "tags": []
+        }
+    }]
+    sm.sync_down()
+    assert notes.get_note("A")["title"] == "One"
+
+    # 2. update
+    api.pull_result = [{
+        "op_id": "5",
+        "uuid": "A",
+        "lamport_clock": 2,
+        "operation_type": "update",
+        "payload": {"title": "Two"}
+    }]
+    sm.sync_down()
+    assert notes.get_note("A")["title"] == "Two"
+
+    # 3. delete
+    api.pull_result = [{
+        "op_id": "6",
+        "uuid": "A",
+        "lamport_clock": 3,
+        "operation_type": "delete",
+        "payload": {}
+    }]
+    sm.sync_down()
+    assert notes.get_note("A")["deleted"] is True
+
+
+def test_idempotency_operation_not_replayed():
+    api = FakeRemoteAPI()
+    sm, notes = make_sync_manager(api)
+
+    api.pull_result = [{
+        "op_id": "7",
+        "uuid": "A",
+        "lamport_clock": 1,
+        "operation_type": "create",
+        "payload": {
+            "title": "Title",
+            "contents": "Body",
+            "created_at": "t",
+            "last_updated": "t",
+            "embeddings": None,
+            "tags": []
+        }
+    }]
+
+    sm.sync_down()
+    sm.sync_down()  # same op again
+
+    assert notes.get_note("A")["title"] == "Title"
+

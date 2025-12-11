@@ -97,7 +97,7 @@ class NotesRepository:
         cursor.execute(query, params)
         self.db.commit_to_database()
 
-    def get_notes_since_last_sync(self, last_sync):
+    def get_notes_since_last_sync(self, last_sync): # TODO deprecated.
         # Get all notes whose last_updated is more recent than last_sync.
         cursor = self.db.get_database_cursor()
         query = "SELECT * FROM notes WHERE last_updated > ?"

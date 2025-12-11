@@ -68,7 +68,6 @@ def main(db):
             contents = input("Enter the contents of your note: ")
             tags = input("Enter comma separated tags for your note: ")
 
-            # TODO should I split the commas before embedding?
             responce = ollama.embeddings(model="nomic-embed-text", prompt=f"{title} {contents} {tags}")
             embeddings = pickle.dumps(responce['embedding'])
 
@@ -78,11 +77,12 @@ def main(db):
             lexical_index.index_note_for_lexical_search(note_id, title, contents)
             faiss_engine.add_embedding(note_id, responce['embedding'])
 
-            note_as_json = {"title": title, "contants": contents, "embeddings": embeddings, "tags": tags}
+            note_as_json = {"title": title, "contents": contents, "embeddings": embeddings, "tags": tags}
 
             lamport_clock.increment_lamport_time()
-            change_log.log_operation(note_id, "create", note_as_json, lamport_clock.lamport_time, device_id)
-            print(f"You succesfully entered a note with an ID of {note_id}")
+            lamport_clock.save_lamport_time_to_db()
+            change_log.log_operation(note_id, "create", note_as_json, lamport_clock.now(), device_id)
+            print(f"You successfully entered a note with an ID of {note_id}")
 
         elif user_choice == '2':
             search_params = input("Enter search parameters: ")
@@ -104,7 +104,7 @@ def main(db):
         elif user_choice == '3':
             note_id = input("Enter ID of note to edit: ")
             title = input("Enter a new title (or leave blank to remain unchanged): ")
-            contents = input("Enter the new contetns (or leave blank): ")
+            contents = input("Enter the new contents (or leave blank): ")
             tags = input("Enter the new tags (or leave blank): ")
             title = title if title.strip() != "" else None
             contents = contents if contents.strip() != "" else None
@@ -117,7 +117,7 @@ def main(db):
             if title is not None:
                 change_as_json['title'] = title
             if contents is not None:
-                change_as_json['contants'] = contents
+                change_as_json['contents'] = contents
             if tags is not None:
                 change_as_json['tags'] = tags
 
@@ -140,7 +140,8 @@ def main(db):
 
             change_as_json['embeddings'] = embeddings
             lamport_clock.increment_lamport_time()
-            change_log.log_operation(note_id, "update", change_as_json, lamport_clock.lamport_time, device_id)
+            lamport_clock.save_lamport_time_to_db()
+            change_log.log_operation(note_id, "update", change_as_json, lamport_clock.now(), device_id)
 
             print("Note updated.")
 
@@ -151,7 +152,8 @@ def main(db):
             search_engine.remove_from_index(note_id)
             faiss_engine.delete_embedding(note_id)
             lamport_clock.increment_lamport_time()
-            change_log.log_operation(note_id, "delete", {"deleted": 1}, lamport_clock.lamport_time, device_id)
+            lamport_clock.save_lamport_time_to_db()
+            change_log.log_operation(note_id, "delete", {"deleted": 1}, lamport_clock.now(), device_id)
             print(f"Note {note_id} marked as deleted.")
 
         elif user_choice == '5':
