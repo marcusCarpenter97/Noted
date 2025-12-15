@@ -35,8 +35,8 @@ class Faiss:
     def delete_embedding(self, uuid):
         faiss_index = self.faiss_to_uuid.index(uuid)
         faiss_index = np.array([faiss_index])
-        self.embedding_database.remove_ids(fiass_index)
-        self.faiss_to_uuis.remove(uuid)
+        self.embedding_database.remove_ids(faiss_index)
+        self.faiss_to_uuid.remove(uuid)
 
     def update_embedding(self, uuid, vector):
         self.delete_embedding(uuid)
