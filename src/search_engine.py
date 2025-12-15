@@ -114,7 +114,7 @@ class SearchEngine:
         lexical_results = self.lexical_search(user_query)
         semantic_results = self.semantic_search(user_query)
 
-        if not lexical_results or semantic_results is None:
+        if not lexical_results and semantic_results is None:
             logging.warning("Could not perform hybid search, database is empty.")
             return
 
@@ -122,12 +122,27 @@ class SearchEngine:
             min_score = min(results, key=lambda x: x[1])[1]
             max_score = max(results, key=lambda x: x[1])[1]
             normalized_scores = defaultdict(float)
+
+            # Sometimes there is only one results or a tie between results
+            # that would yield the min/max functions to return the same
+            # value causing a vivision by 0.
+            if min_score == max_score:
+                for note_id, _ in results:
+                    normalized_scores[note_id] = 1.0
+                return normalized_scores
+
             for note_id, score in results:
                 normalized_scores[note_id] = (score - min_score) / (max_score - min_score)
             return normalized_scores
 
-        normalized_lexical_scores = normalize_scores(lexical_results)
-        normalized_semantic_scores = normalize_scores(semantic_results)
+        normalized_lexical_scores = defaultdict(float)
+        normalized_semantic_scores = defaultdict(float)
+
+        if lexical_results:
+            normalized_lexical_scores = normalize_scores(lexical_results)
+
+        if semantic_results:
+            normalized_semantic_scores = normalize_scores(semantic_results)
 
         all_note_ids = []
         for note_id, _ in lexical_results:
