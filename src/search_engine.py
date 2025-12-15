@@ -98,8 +98,9 @@ class SearchEngine:
             logging.warning("Semantic database is empty. Could not search semanticaly.")
             return
 
+        # If we find unretreived indices in the results store their positions.
         if any(x == -1 for x in indices):
-            positions = [i for i in enumerate(indices) if indices[i] == -1]
+            positions = [i for i, v in enumerate(indices) if v == -1]
             indices = np.delete(indices, positions)
             distances = np.delete(distances, positions)
 
