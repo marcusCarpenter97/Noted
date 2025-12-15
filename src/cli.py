@@ -32,6 +32,8 @@ def main(db):
                         level=logging.INFO,
                         format="%(asctime)s - %(levelname)s - %(message)s")
 
+    logging.captureWarnings(True)
+
     device = DeviceID(db)
     device_id = device.get_or_generate_device_id()
     private_key, public_key = device.get_or_generate_public_private_keys()
