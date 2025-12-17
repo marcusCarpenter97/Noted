@@ -1,0 +1,35 @@
+services:
+
+  advertiser:
+    build: .
+    command: python -u app/Noted/cli.py
+    stdin_open: true
+    tty: true
+    environment:
+      OLLAMA_HOST: http://host.docker.internal:11434
+      DB_PATH: /data/database.db
+    volumes:
+      - noted_device_a:/data
+    networks:
+      - mdns_net
+
+  listener:
+    build: .
+    command: python -u app/Noted/cli.py
+    stdin_open: true
+    tty: true
+    environment:
+      OLLAMA_HOST: http://host.docker.internal:11434
+      DB_PATH: /data/database.db
+    volumes:
+      - noted_device_b:/data
+    networks:
+      - mdns_net
+
+networks:
+  mdns_net:
+    driver: bridge
+
+volumes:
+  noted_device_a:
+  noted_device_b:
