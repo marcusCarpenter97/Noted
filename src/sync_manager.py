@@ -1,5 +1,4 @@
 import json
-import ollama
 import logging
 import pickle
 from datetime import datetime
@@ -10,7 +9,7 @@ from remote_api_client import RemoteAPIClient
 
 class SyncManager:
 
-    def __init__(self, db, device_id, notes_repository, change_log, lamport_clock, se, li, fe, api_client):
+    def __init__(self, db, device_id, notes_repository, change_log, lamport_clock, se, li, fe, ep, api_client):
         self.db = db
         self.device_id = device_id
         self.notes_repo = notes_repository
@@ -19,6 +18,7 @@ class SyncManager:
         self.search_engine = se
         self.lexical_index = li
         self.faiss_engine = fe
+        self.embedding_provider = ep
         self.api_client = api_client
         self.create_last_sync_table()
         self.initialize_sync_table()
@@ -83,8 +83,9 @@ class SyncManager:
                     self.lamport_clock.increment_lamport_time(remote_operation['lamport_clock'])
                     self.lamport_clock.save_lamport_time_to_db()
 
-                    responce = ollama.embeddings(model="nomic-embed-text", prompt=
+                    responce = self.embedding_provider.embed(
                         f"{remote_operation['payload']['title']} {remote_operation['payload']['contents']} {remote_operation['payload']['tags']}")
+
 
                     embeddings = pickle.dumps(responce['embedding'])
 
@@ -123,7 +124,7 @@ class SyncManager:
                     note = self.notes_repo.get_note(remote_operation['uuid'])
                     self.lexical_index.index_note_for_lexical_search(note['uuid'], note['title'], note['contents'])
 
-                    responce = ollama.embeddings(model="nomic-embed-text", prompt=f"{note['title']} {note['contents']} {note['tags']}")
+                    responce = self.embedding_provider.embed(f"{note['title']} {note['contents']} {note['tags']}")
                     self.faiss_engine.add_embedding(remote_operation['uuid'], responce['embedding'])
 
                     self.change_log.log_operation(remote_operation['uuid'],

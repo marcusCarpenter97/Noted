@@ -1,15 +1,15 @@
 import math
-import ollama
 import logging
 import numpy as np
 from collections import defaultdict
 
 class SearchEngine:
-    def __init__(self, notes_repo, notes_index, lexical_index, faiss_engine, tokenizer):
+    def __init__(self, notes_repo, notes_index, lexical_index, faiss_engine, emb_prov, tokenizer):
         self.notes_repo = notes_repo
         self.notes_index = notes_index
         self.lexical_index = lexical_index
         self.embedding_database = faiss_engine
+        self.embedding_provider = emb_prov
         self.tokenizer = tokenizer
 
     def index_note(self, note_id):
@@ -85,7 +85,7 @@ class SearchEngine:
 
     def semantic_search(self, user_query, neighbours=10):
 
-        responce = ollama.embeddings(model="nomic-embed-text", prompt=user_query)
+        responce = self.embedding_provider.embed(user_query)
         embeddings = np.array(responce['embedding'])
         embeddings = embeddings.reshape(1, embeddings.shape[0])
 

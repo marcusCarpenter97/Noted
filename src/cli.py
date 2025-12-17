@@ -1,5 +1,4 @@
 import pickle
-import ollama
 import logging
 import numpy as np
 from database import Database
@@ -9,9 +8,12 @@ from note_index import NoteIndex
 from lamport_clock import LamportClock
 from search_engine import SearchEngine
 from lexical_index import LexicalIndex
+from installation_wizard import run_wizard
 from device_identification import DeviceID
 from change_log_repository import ChangeLog
 from notes_repository import NotesRepository
+from peer_to_peer import advertise, discover
+from embedding_provider import EmbeddingProvider
 
 def print_note(note):
     print("UUID: ", note['uuid'])
@@ -24,19 +26,9 @@ def print_note(note):
     print("Deleted: ", note['deleted'])
     print()
 
-def main(db):
+def main(db, device_id):
 
-    print("\nWelcome to Noted.\n")
-
-    logging.basicConfig(filename="noted.log",
-                        level=logging.INFO,
-                        format="%(asctime)s - %(levelname)s - %(message)s")
-
-    logging.captureWarnings(True)
-
-    device = DeviceID(db)
-    device_id = device.get_or_generate_device_id()
-    private_key, public_key = device.get_or_generate_public_private_keys()
+    embedding_prov = EmbeddingProvider()
 
     lamport_clock = LamportClock(db)
     lamport_clock.initialize_lamport_clock()
@@ -53,16 +45,16 @@ def main(db):
     change_log = ChangeLog(db)
     change_log.create_change_log_table()
 
-    faiss_engine = Faiss(notes_db)
+    faiss_engine = Faiss(embedding_prov, notes_db)
 
     tokenizer = Tokenizer()
 
-    search_engine = SearchEngine(notes_db, note_index, lexical_index, faiss_engine, tokenizer)
+    search_engine = SearchEngine(notes_db, note_index, lexical_index, faiss_engine, embedding_prov, tokenizer)
 
     while True:
 
         user_choice = input(
-            "Choose an option:\n1. Enter a new note\n2. Search for a note\n3. Edit a note\n4. Delete a note\nYour choice: ")
+            "Choose an option:\n1. Enter a new note\n2. Search for a note\n3. Edit a note\n4. Delete a note\n5. List all\nYour choice: ")
 
         if user_choice == '1':
             print("Enter the data for your note or leave it blank.")
@@ -70,7 +62,7 @@ def main(db):
             contents = input("Enter the contents of your note: ")
             tags = input("Enter comma separated tags for your note: ")
 
-            responce = ollama.embeddings(model="nomic-embed-text", prompt=f"{title} {contents} {tags}")
+            responce = embedding_prov.embed(f"{title} {contents} {tags}")
             embeddings = pickle.dumps(responce['embedding'])
 
             note_id = notes_db.create_note(title, contents, embeddings, tags)
@@ -131,7 +123,7 @@ def main(db):
             if tags is None:
                 tags = old_note['tags']
 
-            responce = ollama.embeddings(model="nomic-embed-text", prompt=f"{title} {contents} {tags}")
+            responce = embedding_prov.embed(f"{title} {contents} {tags}")
             embeddings = pickle.dumps(responce['embedding'])
 
             notes_db.update_note(note_id, title, contents, embeddings, tags)
@@ -168,11 +160,34 @@ def main(db):
 
 if __name__ == "__main__":
 
+    logging.basicConfig(filename="noted.log",
+                        level=logging.INFO,
+                        format="%(asctime)s - %(levelname)s - %(message)s")
+
+    logging.captureWarnings(True)
+
+    print("\nWelcome to Noted.\n")
+
+    device_name = input("New device detected. Enter device name: ")
+
     db = Database()
 
+    device = DeviceID(db)
+    device_id = device.get_or_generate_device_id()
+    private_key, public_key = device.get_or_generate_public_private_keys()
+
+    print(device_id)
+    advertiser, info = advertise(device_id, device_name)
+    discoverer = discover(device_id)
+
     try:
-        main(db)
+        run_wizard()
+        main(db, device_id)
     except KeyboardInterrupt:
-        print("\nClosing database ...\n")
+        print("\nClosing database ...")
         db.close_database_connection()
+        print("Unregistering device ...\n")
+        advertiser.unregister_service(info)
+        advertiser.close()
+        discoverer.close()
         raise SystemExit

@@ -5,3 +5,4 @@ faiss-cpu
 ollama
 PyNaCl
 zeroconf
+requests

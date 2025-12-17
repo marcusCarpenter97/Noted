@@ -1,11 +1,11 @@
 import faiss
 import pickle
-import ollama
 import numpy as np
 
 class Faiss:
-    def __init__(self, notes_repository):
+    def __init__(self, emb_prov, notes_repository):
         self.notes_repo = notes_repository
+        self.embedding_provider = emb_prov
 
         self.embedding_dim = self._get_embedding_dimension()
         self.embedding_database = faiss.IndexFlatL2(self.embedding_dim)
@@ -14,7 +14,7 @@ class Faiss:
         self.initialize_faiss_index()
 
     def _get_embedding_dimension(self):
-        sample = ollama.embeddings(model="nomic-embed-text", prompt="dimension probe")
+        sample = self.embedding_provider.embed("dimension probe")
         return len(sample["embedding"])
 
     def initialize_faiss_index(self):
