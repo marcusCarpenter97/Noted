@@ -110,6 +110,10 @@ class FakeChangeLog:
         self.ops[op_id] = True
 
 
+class FakeEmbeddings:
+    def embed(self, text):
+        return {"embedding": [0.1, 0.2, 0.3]}
+
 # ────────────────────────────────────────────────────────────────
 #   Helper: build SyncManager with minimal mocks
 # ────────────────────────────────────────────────────────────────
@@ -124,6 +128,7 @@ def make_sync_manager(api):
     se = Mock()
     li = Mock()
     fe = Mock()
+    ep = FakeEmbeddings()
 
     return SyncManager(
         db=db,
@@ -134,6 +139,7 @@ def make_sync_manager(api):
         se=se,
         li=li,
         fe=fe,
+        ep=ep,
         api_client=api
     ), notes
 

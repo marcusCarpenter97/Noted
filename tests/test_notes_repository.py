@@ -11,13 +11,17 @@ def reset_db():
     Database._instance = None
     Database._initialized = None
 
-def test_create_note():
+@pytest.fixture
+def fake_embedding():
+    return {"embedding": [0.123, 0.69, 0.93]}
+
+def test_create_note(fake_embedding):
     db = Database(":memory:")
     notes_db = NotesRepository(db)
     notes_db.create_notes_table()
 
-    sample = ollama.embeddings(model="nomic-embed-text", prompt="dimension probe")
-    note_id = notes_db.create_note("Title", "Body", pickle.dumps(sample['embedding']), "tag1")
+    #sample = ollama.embeddings(model="nomic-embed-text", prompt="dimension probe")
+    note_id = notes_db.create_note("Title", "Body", pickle.dumps(fake_embedding['embedding']), "tag1")
     note = notes_db.get_note(note_id)
 
     assert note is not None
@@ -29,12 +33,11 @@ def test_get_note_not_found():
     notes_db.create_notes_table()
     assert notes_db.get_note(0) is None
 
-def test_get_note_deleted_note_is_still_returned():
+def test_get_note_deleted_note_is_still_returned(fake_embedding):
     db = Database(":memory:")
     notes_db = NotesRepository(db)
     notes_db.create_notes_table()
-    sample = ollama.embeddings(model="nomic-embed-text", prompt="dimension probe")
-    note_id = notes_db.create_note("Title", "Body", pickle.dumps(sample['embedding']), "tag1")
+    note_id = notes_db.create_note("Title", "Body", pickle.dumps(fake_embedding['embedding']), "tag1")
     notes_db.mark_note_as_deleted(note_id)
     note = notes_db.get_note(note_id)
     assert note is not None
@@ -73,12 +76,12 @@ def test_mark_note_as_deleted_sets_flag():
     assert note is not None
     assert note['deleted'] == 1
 
-def test_update_note():
+def test_update_note(fake_embedding):
     db = Database(":memory:")
     notes_db = NotesRepository(db)
     notes_db.create_notes_table()
-    sample = ollama.embeddings(model="nomic-embed-text", prompt="dimension probe")
-    note_id = notes_db.create_note("Title", "Body", pickle.dumps(sample['embedding']), "tag1")
+    #sample = ollama.embeddings(model="nomic-embed-text", prompt="dimension probe")
+    note_id = notes_db.create_note("Title", "Body", pickle.dumps(fake_embedding['embedding']), "tag1")
     notes_db.update_note(note_id, title="New Title")
 
     note = notes_db.get_note(note_id)

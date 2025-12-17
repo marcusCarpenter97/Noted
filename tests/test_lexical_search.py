@@ -88,22 +88,29 @@ def faiss_engine():
             pass
     return MockFaiss()
 
+@pytest.fixture
+def emb_prov():
+    class MockEmbeddingProvider:
+        def __init__(self):
+            pass
+    return MockEmbeddingProvider()
+
 # -------------------------------------------------------------
 #                    TEST CASES
 # -------------------------------------------------------------
 
-def test_returns_empty_if_no_docs(tokenizer, notes_repo, notes_index, faiss_engine, lexical_index):
+def test_returns_empty_if_no_docs(tokenizer, notes_repo, notes_index, faiss_engine, emb_prov, lexical_index):
     # override lexical index to return zero results
     lexical_index.results = {}
 
-    engine = SearchEngine(notes_repo, notes_index, lexical_index, faiss_engine, tokenizer)
+    engine = SearchEngine(notes_repo, notes_index, lexical_index, faiss_engine, emb_prov, tokenizer)
     result = engine.lexical_search("foo")
 
     assert result == []
 
 
-def test_bm25_correctly_ranks_documents(tokenizer, notes_repo, notes_index, faiss_engine, lexical_index):
-    engine = SearchEngine(notes_repo, notes_index, lexical_index, faiss_engine, tokenizer)
+def test_bm25_correctly_ranks_documents(tokenizer, notes_repo, notes_index, faiss_engine, emb_prov, lexical_index):
+    engine = SearchEngine(notes_repo, notes_index, lexical_index, faiss_engine, emb_prov, tokenizer)
     
     # Query: "foo"
     result = engine.lexical_search("foo")
@@ -117,8 +124,8 @@ def test_bm25_correctly_ranks_documents(tokenizer, notes_repo, notes_index, fais
     assert result[0][1] >= result[1][1]
 
 
-def test_multiple_tokens_accumulate(tokenizer, notes_repo, notes_index, faiss_engine, lexical_index):
-    engine = SearchEngine(notes_repo, notes_index, lexical_index, faiss_engine, tokenizer)
+def test_multiple_tokens_accumulate(tokenizer, notes_repo, notes_index, faiss_engine, emb_prov, lexical_index):
+    engine = SearchEngine(notes_repo, notes_index, lexical_index, faiss_engine, emb_prov, tokenizer)
 
     # Query containing two tokens that both appear in A
     # foo -> A,B
@@ -133,7 +140,7 @@ def test_multiple_tokens_accumulate(tokenizer, notes_repo, notes_index, faiss_en
     assert score_A > score_B
 
 
-def test_idf_computation_is_called_properly(tokenizer, notes_repo, notes_index, faiss_engine, lexical_index, monkeypatch):
+def test_idf_computation_is_called_properly(tokenizer, notes_repo, notes_index, faiss_engine, emb_prov, lexical_index, monkeypatch):
     """
     We mock math.log to ensure IDF is being passed the correct numerator/denominator.
     """
@@ -145,7 +152,7 @@ def test_idf_computation_is_called_properly(tokenizer, notes_repo, notes_index, 
 
     monkeypatch.setattr("math.log", fake_log)
 
-    engine = SearchEngine(notes_repo, notes_index, lexical_index, faiss_engine, tokenizer)
+    engine = SearchEngine(notes_repo, notes_index, lexical_index, faiss_engine, emb_prov, tokenizer)
     engine.lexical_search("foo")
 
     # total=2 notes, "foo" appears in both (2)
