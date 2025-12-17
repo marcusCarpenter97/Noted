@@ -10,6 +10,7 @@ from search_engine import SearchEngine
 from lexical_index import LexicalIndex
 from installation_wizard import run_wizard
 from device_identification import DeviceID
+from transport_layer import TransportLayer
 from change_log_repository import ChangeLog
 from notes_repository import NotesRepository
 from peer_to_peer import advertise, discover
@@ -176,9 +177,11 @@ if __name__ == "__main__":
     device_id = device.get_or_generate_device_id()
     private_key, public_key = device.get_or_generate_public_private_keys()
 
-    print(device_id)
-    advertiser, info = advertise(device_id, device_name)
-    discoverer = discover(device_id)
+    transport_layer = TransportLayer(private_key)
+    transport_layer.run_tcp_server()
+
+    advertiser, info = advertise(device_id, public_key, device_name)
+    discoverer = discover(device_id, transport_layer)
 
     try:
         run_wizard()

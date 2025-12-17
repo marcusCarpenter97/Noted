@@ -1,23 +1,30 @@
 from zeroconf import Zeroconf, ServiceInfo, ServiceBrowser
+import base64
 import socket
-import time
 import logging
 
 class ServiceListener:
 
-    def __init__(self, device_id):
+    def __init__(self, device_id, transport_layer):
         self.device_id = device_id
+        self.transport_layer = transport_layer
 
     def add_service(self, zeroconf, service_type, name):
         logging.info(f"[+] Service added: {name}")
         info = zeroconf.get_service_info(service_type, name)
-        if info:
-            properties = self.decode_dict(info.properties)
-            if properties["device_id"] != self.device_id:
-                print(" Address:", socket.inet_ntoa(info.addresses[0]))
-                print(" Port:", info.port)
-                print(" Conecting device id:", properties["device_id"])
-                print(" New device connected:", properties["device_name"])
+
+        if not info:
+            return
+
+        properties = self.decode_dict(info.properties)
+
+        if properties["device_id"] == self.device_id:
+            return
+
+        properties["peer_ip"] = socket.inet_ntoa(info.addresses[0])
+        properties["peer_port"] = info.port
+
+        self.transport_layer.register_new_peer(properties)
 
     def remove_service(self, zeroconf, service_type, name):
         logging.info(f"[-] Service removed: {name}")
@@ -27,10 +34,14 @@ class ServiceListener:
         logging.info(f"[~] Service updated: {name}")
 
     def decode_dict(self, d):
-        return {k.decode() if isinstance(k, bytes) else k:
-                v.decode() if isinstance(v, bytes) else v
-                for k, v in d.items()}
-
+        decoded = {}
+        for k, v in d.items():
+            key = k.decode() if isinstance(k, bytes) else k
+            if key == "public_key":
+                decoded[key] = v
+            else:
+                decoded[key] = v.decode() if isinstance(v, bytes) else v
+        return decoded
 
 def get_default_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -43,7 +54,7 @@ def get_default_ip():
         s.close()
     return ip
 
-def advertise(device_id, device_name):
+def advertise(device_id, public_key, device_name):
     zeroconf = Zeroconf()
 
     service_type = "_noted._tcp.local."
@@ -54,6 +65,7 @@ def advertise(device_id, device_name):
 
     properties = {
         "device_id": device_id,
+        "public_key": base64.b64encode(public_key).decode("ascii"),
         "device_name": device_name
     }
 
@@ -69,9 +81,9 @@ def advertise(device_id, device_name):
 
     return zeroconf, info
 
-def discover(device_id):
+def discover(device_id, transport_layer):
     zeroconf = Zeroconf()
-    listener = ServiceListener(device_id)
+    listener = ServiceListener(device_id, transport_layer)
 
     service_type = "_noted._tcp.local."
 
