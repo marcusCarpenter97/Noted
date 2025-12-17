@@ -1,5 +1,5 @@
 
-from nacl.signing import SigningKey
+from nacl.public import PrivateKey
 import uuid
 
 class DeviceID:
@@ -34,14 +34,12 @@ class DeviceID:
         row = cursor.fetchone()
 
         if row:
-            private = SigningKey(row[0])
-            public = private.verify_key
-            return private, public
+            return row['private_key'], row['public_key']
 
-        private = SigningKey.generate()
-        public = private.verify_key
+        private = PrivateKey.generate()
+        public = private.public_key
 
         cursor.execute("INSERT INTO keys VALUES (?, ?, ?)", ("p2p", private.encode(), public.encode()))
         self.db.commit_to_database()
 
-        return private, public
+        return private.encode(), public.encode()
