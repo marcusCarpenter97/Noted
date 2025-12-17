@@ -1,9 +1,9 @@
+import os
 import uuid
-import logging 
+import logging
 import sqlite3
-import numpy as np
 
-DATABASE_PATH = 'database/database.db'
+DATABASE_PATH = os.environ.get("DB_PATH", 'database/database.db')
 
 class Database:
     "Implements a database connection to SQLite as a singleton."
