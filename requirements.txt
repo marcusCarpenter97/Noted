@@ -1,0 +1,8 @@
+numpy
+pytest
+wonderwords
+faiss-cpu
+ollama
+PyNaCl
+zeroconf
+requests

@@ -1,0 +1,126 @@
+import uuid
+from hashing import compute_note_hash
+
+class NotesRepository:
+    def __init__(self, db):
+        self.db = db
+
+    def create_notes_table(self):
+        cursor = self.db.get_database_cursor()
+        cursor.execute("""CREATE TABLE IF NOT EXISTS notes(
+                        uuid TEXT PRIMARY KEY,
+                        title TEXT,
+                        contents TEXT,
+                        created_at DATETIME,
+                        last_updated DATETIME,
+                        embeddings BLOB,
+                        tags TEXT,
+                        deleted BOOLEAN DEFAULT 0,
+                        note_hash TEXT)""")
+
+    def create_note(self, title, contents, embeddings, tags):
+        cursor = self.db.get_database_cursor()
+        unique_id = str(uuid.uuid4())
+        note_hash = compute_note_hash(title, contents, tags, embeddings, deleted=0)
+        cursor.execute("INSERT INTO notes (uuid, title, contents, created_at, last_updated, embeddings, tags, note_hash) VALUES(?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, ?)", (unique_id, title, contents, embeddings, tags, note_hash))
+        self.db.commit_to_database()
+        return unique_id
+
+    def insert_note(self, uuid, title, contents, created_at, last_updated, embeddings, tags):
+        cursor = self.db.get_database_cursor()
+        note_hash = compute_note_hash(title, contents, tags, embeddings, deleted=0)
+        cursor.execute("INSERT INTO notes (uuid, title, contents, created_at, last_updated, embeddings, tags, note_hash) VALUES(?, ?, ?, ?, ?, ?, ?, ?)", (uuid, title, contents, created_at, last_updated, embeddings, tags, note_hash))
+        self.db.commit_to_database()
+
+    def get_note(self, note_id):
+        cursor = self.db.get_database_cursor()
+        cursor.execute("SELECT * FROM notes WHERE uuid=(?)", (note_id,))
+        return cursor.fetchone()
+
+    def get_number_of_non_deleted_notes(self):
+        cursor = self.db.get_database_cursor()
+        cursor.execute("SELECT COUNT(*) FROM notes WHERE deleted = 0")
+        return cursor.fetchone()[0]
+
+    def list_all_notes(self, include_deleted=False):
+        cursor = self.db.get_database_cursor()
+        if include_deleted:
+            query = "SELECT * FROM notes"
+        else:
+            query = "SELECT * FROM notes WHERE deleted != 1"
+        cursor.execute(query)
+        return cursor.fetchall()
+
+    def update_note(self, note_id, title=None, contents=None, embeddings=None, tags=None):
+        cursor = self.db.get_database_cursor()
+
+        current_note = self.get_note(note_id)
+        if current_note is None:
+            return None
+
+        _, cur_title, cur_contents, _, _, cur_embeddings, cur_tags, cur_deleted, _, = current_note
+
+        new_title = title if title is not None else cur_title
+        new_contents = contents if contents is not None else cur_contents
+        new_embeddings = embeddings if embeddings is not None else cur_embeddings
+        new_tags = tags if tags is not None else cur_tags
+
+        new_hash = compute_note_hash(new_title, new_contents, new_tags, new_embeddings, cur_deleted)
+
+        updates = []
+        params = []
+
+        if title is not None:
+            updates.append("title = ?")
+            params.append(new_title)
+
+        if contents is not None:
+            updates.append("contents = ?")
+            params.append(new_contents)
+
+        if embeddings is not None:
+            updates.append("embeddings = ?")
+            params.append(new_embeddings)
+
+        if tags is not None:
+            updates.append("tags = ?")
+            params.append(new_tags)
+
+        updates.append("last_updated = CURRENT_TIMESTAMP")
+
+        if not params and len(updates) == 1:
+            return None
+
+        query = f"UPDATE notes SET {', '.join(updates)} WHERE uuid = ?"
+        params.append(note_id)
+
+        cursor.execute(query, params)
+        self.db.commit_to_database()
+
+    def get_notes_since_last_sync(self, last_sync): # TODO deprecated.
+        # Get all notes whose last_updated is more recent than last_sync.
+        cursor = self.db.get_database_cursor()
+        query = "SELECT * FROM notes WHERE last_updated > ?"
+        cursor.execute(query, (last_sync,))
+        return cursor.fetchall()
+
+    def get_operations_since(self, timestamp):
+        cursor = self.db.get_database_cursor()
+        query = """
+                SELECT * FROM change_log WHERE timestamp > ? ORDER BY timestamp ASC
+                """
+        cursor.execute(query, (timestamp,))
+        return cursor.fetchall()
+
+    def mark_note_as_deleted(self, note_id):
+        cursor = self.db.get_database_cursor()
+
+        current_note = self.get_note(note_id)
+        if current_note is None:
+            return
+
+        _, title, contents, _, _, embeddings, tags, _, _ = current_note
+
+        new_hash = compute_note_hash(title, contents, tags, embeddings, deleted=1)
+        cursor.execute("UPDATE notes SET deleted = 1, note_hash = ?, last_updated = CURRENT_TIMESTAMP WHERE uuid = ?", (new_hash, note_id))
+        self.db.commit_to_database()
