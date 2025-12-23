@@ -1,10 +1,10 @@
 import pickle
 import logging
-import numpy as np
 from database import Database
 from faiss_engine import Faiss
 from tokenizer import Tokenizer
 from note_index import NoteIndex
+from sync_manager import SyncManager
 from lamport_clock import LamportClock
 from search_engine import SearchEngine
 from lexical_index import LexicalIndex
@@ -22,12 +22,11 @@ def print_note(note):
     print("Contents: ", note['contents'])
     print("Created at: ", note['created_at'])
     print("Last updated: ", note['last_updated'])
-    #print("Embeddings: ", pickle.loads(note['embeddings']))
     print("Tags: ", note['tags'])
     print("Deleted: ", note['deleted'])
     print()
 
-def main(db, device_id):
+def main(db, device_id, transport_layer):
 
     embedding_prov = EmbeddingProvider()
 
@@ -52,10 +51,15 @@ def main(db, device_id):
 
     search_engine = SearchEngine(notes_db, note_index, lexical_index, faiss_engine, embedding_prov, tokenizer)
 
-    while True:
+    synchronization_manager = SyncManager(db, device_id, notes_db,
+                                          change_log, lamport_clock,
+                                          search_engine, lexical_index,
+                                          faiss_engine, embedding_prov,
+                                          transport_layer)
 
+    while True:
         user_choice = input(
-            "Choose an option:\n1. Enter a new note\n2. Search for a note\n3. Edit a note\n4. Delete a note\n5. List all\nYour choice: ")
+            "Choose an option:\n1. Enter a new note\n2. Search for a note\n3. Edit a note\n4. Delete a note\n5. List all\n6. Sync\nYour choice: ")
 
         if user_choice == '1':
             print("Enter the data for your note or leave it blank.")
@@ -156,12 +160,15 @@ def main(db, device_id):
             for note in notes_db.list_all_notes():
                 print_note(note)
 
+        elif user_choice == '6':
+            synchronization_manager.sync()
+
         else:
             print("\nInvalid choice. Try again or press ctrl c to exit.\n")
 
 if __name__ == "__main__":
 
-    logging.basicConfig(filename="noted.log",
+    logging.basicConfig(handlers=[logging.StreamHandler(), logging.FileHandler("noted.log")],
                         level=logging.INFO,
                         format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -177,7 +184,7 @@ if __name__ == "__main__":
     device_id = device.get_or_generate_device_id()
     private_key, public_key = device.get_or_generate_public_private_keys()
 
-    transport_layer = TransportLayer(private_key)
+    transport_layer = TransportLayer(device_id, public_key, private_key)
     transport_layer.run_tcp_server()
 
     advertiser, info = advertise(device_id, public_key, device_name)
@@ -185,7 +192,7 @@ if __name__ == "__main__":
 
     try:
         run_wizard()
-        main(db, device_id)
+        main(db, device_id, transport_layer)
     except KeyboardInterrupt:
         print("\nClosing database ...")
         db.close_database_connection()
