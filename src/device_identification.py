@@ -1,5 +1,5 @@
-
-from nacl.public import PrivateKey
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives import serialization
 import uuid
 
 class DeviceID:
@@ -34,12 +34,21 @@ class DeviceID:
         row = cursor.fetchone()
 
         if row:
-            return row['private_key'], row['public_key']
+            private = serialization.load_der_private_key(row["private_key"], password=None)
+            public = serialization.load_der_public_key(row["public_key"])
+            return private, public
 
-        private = PrivateKey.generate()
-        public = private.public_key
+        private = ec.generate_private_key(ec.SECP256R1())
+        public = private.public_key()
 
-        cursor.execute("INSERT INTO keys VALUES (?, ?, ?)", ("p2p", private.encode(), public.encode()))
+        private_bytes = private.private_bytes(encoding=serialization.Encoding.DER,
+                                              format=serialization.PrivateFormat.PKCS8,
+                                              encryption_algorithm=serialization.NoEncryption())
+
+        public_bytes = public.public_bytes(encoding=serialization.Encoding.DER,
+                                           format=serialization.PublicFormat.SubjectPublicKeyInfo)
+
+        cursor.execute("INSERT INTO keys VALUES (?, ?, ?)", ("p2p", private_bytes, public_bytes))
         self.db.commit_to_database()
 
-        return private.encode(), public.encode()
+        return private, public
