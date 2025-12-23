@@ -118,7 +118,7 @@ class FakeEmbeddings:
 #   Helper: build SyncManager with minimal mocks
 # ────────────────────────────────────────────────────────────────
 
-def make_sync_manager(api):
+def make_sync_manager():
     db = FakeDB()
     notes = FakeNotesRepository()
     clock = FakeLamportClock()
@@ -129,6 +129,7 @@ def make_sync_manager(api):
     li = Mock()
     fe = Mock()
     ep = FakeEmbeddings()
+    tl = Mock()
 
     return SyncManager(
         db=db,
@@ -140,7 +141,7 @@ def make_sync_manager(api):
         li=li,
         fe=fe,
         ep=ep,
-        api_client=api
+        transport_layer=tl
     ), notes
 
 
@@ -149,8 +150,9 @@ def make_sync_manager(api):
 # ────────────────────────────────────────────────────────────────
 
 def test_create_note_from_remote():
-    api = FakeRemoteAPI()
-    api.pull_result = [{
+    #api = FakeRemoteAPI()
+    #api.pull_result = [{
+    message = [{
         "op_id": "1",
         "uuid": "A",
         "lamport_clock": 5,
@@ -165,20 +167,20 @@ def test_create_note_from_remote():
         }
     }]
 
-    sm, notes = make_sync_manager(api)
-    sm.sync_down()
+    sm, notes = make_sync_manager()
+    sm.sync_down("A", message)
 
     assert notes.get_note("A")["title"] == "Hello"
 
 
 def test_update_note_from_remote():
-    api = FakeRemoteAPI()
-    sm, notes = make_sync_manager(api)
+    #api = FakeRemoteAPI()
+    sm, notes = make_sync_manager()
 
     # local existing
     notes.insert_note("A", "Old", "Body", "2020", "2020", None, [])
 
-    api.pull_result = [{
+    message = [{
         "op_id": "2",
         "uuid": "A",
         "lamport_clock": 10,
@@ -186,19 +188,19 @@ def test_update_note_from_remote():
         "payload": {"title": "New Title"}
     }]
 
-    sm.sync_down()
+    sm.sync_down("A", message)
 
     assert notes.get_note("A")["title"] == "New Title"
     assert notes.get_note("A")["contents"] == "Body"  # unchanged
 
 
 def test_delete_note_from_remote():
-    api = FakeRemoteAPI()
-    sm, notes = make_sync_manager(api)
+    #api = FakeRemoteAPI()
+    sm, notes = make_sync_manager()
 
     notes.insert_note("A", "T", "C", "2020", "2020", None, [])
 
-    api.pull_result = [{
+    message = [{
         "op_id": "3",
         "uuid": "A",
         "lamport_clock": 7,
@@ -206,17 +208,17 @@ def test_delete_note_from_remote():
         "payload": {}
     }]
 
-    sm.sync_down()
+    sm.sync_down("A", message)
 
     assert notes.get_note("A")["deleted"] is True
 
 
 def test_multiple_operations_in_order():
-    api = FakeRemoteAPI()
-    sm, notes = make_sync_manager(api)
+    #api = FakeRemoteAPI()
+    sm, notes = make_sync_manager()
 
     # 1. create
-    api.pull_result = [{
+    message = [{
         "op_id": "4",
         "uuid": "A",
         "lamport_clock": 1,
@@ -230,37 +232,37 @@ def test_multiple_operations_in_order():
             "tags": []
         }
     }]
-    sm.sync_down()
+    sm.sync_down("A", message)
     assert notes.get_note("A")["title"] == "One"
 
     # 2. update
-    api.pull_result = [{
+    message = [{
         "op_id": "5",
         "uuid": "A",
         "lamport_clock": 2,
         "operation_type": "update",
         "payload": {"title": "Two"}
     }]
-    sm.sync_down()
+    sm.sync_down("A", message)
     assert notes.get_note("A")["title"] == "Two"
 
     # 3. delete
-    api.pull_result = [{
+    message = [{
         "op_id": "6",
         "uuid": "A",
         "lamport_clock": 3,
         "operation_type": "delete",
         "payload": {}
     }]
-    sm.sync_down()
+    sm.sync_down("A", message)
     assert notes.get_note("A")["deleted"] is True
 
 
 def test_idempotency_operation_not_replayed():
-    api = FakeRemoteAPI()
-    sm, notes = make_sync_manager(api)
+    #api = FakeRemoteAPI()
+    sm, notes = make_sync_manager()
 
-    api.pull_result = [{
+    message = [{
         "op_id": "7",
         "uuid": "A",
         "lamport_clock": 1,
@@ -275,8 +277,8 @@ def test_idempotency_operation_not_replayed():
         }
     }]
 
-    sm.sync_down()
-    sm.sync_down()  # same op again
+    sm.sync_down("A", message)
+    sm.sync_down("A", message)  # same op again
 
     assert notes.get_note("A")["title"] == "Title"
 
