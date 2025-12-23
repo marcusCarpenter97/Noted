@@ -1,6 +1,7 @@
 *.db
 *.log
 *.swp
+*~
 .idea/
 docs/
 venv/
