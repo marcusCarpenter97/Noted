@@ -1,7 +1,5 @@
-import json
 import logging
 import pickle
-from datetime import datetime
 from database import Database
 from change_log_repository import ChangeLog
 from notes_repository import NotesRepository
@@ -9,7 +7,7 @@ from remote_api_client import RemoteAPIClient
 
 class SyncManager:
 
-    def __init__(self, db, device_id, notes_repository, change_log, lamport_clock, se, li, fe, ep, api_client):
+    def __init__(self, db, device_id, notes_repository, change_log, lamport_clock, se, li, fe, ep, transport_layer):
         self.db = db
         self.device_id = device_id
         self.notes_repo = notes_repository
@@ -19,9 +17,10 @@ class SyncManager:
         self.lexical_index = li
         self.faiss_engine = fe
         self.embedding_provider = ep
-        self.api_client = api_client
+        self.transport_layer = transport_layer
         self.create_last_sync_table()
         self.initialize_sync_table()
+        self.transport_layer.register_message_handler(self.sync_down)
 
     def create_last_sync_table(self):
         cursor = self.db.get_database_cursor()
@@ -53,23 +52,19 @@ class SyncManager:
         try:
             for i in range(0, len(operations), batch_size):
                 batch = operations[i : i + batch_size]
-                result = self.api_client.push_changes(batch)
+                result = self.transport_layer.push_changes(batch)
                 logging.info(result)
         except Exception as e:
             logging.error(f"Failed to push changes: %s", e)
             return
 
-    def sync_down(self):
+    def sync_down(self, peer_device_id, message):
         """ Pull new changes from the server. """
         last_sync_at = self.get_last_sync()
 
-        try:  # TODO add batching to pull_changes function
-            results = self.api_client.pull_changes(last_sync_at)
-        except Exception as e:
-            logging.error(f"Failed to pull changes: %s", e)
-            return
+        logging.info(f"Received {len(message)} notes from {peer_device_id}")
 
-        results = sorted(results, key=lambda x: x.get('lamport_clock', 0))
+        results = sorted(message, key=lambda x: x.get('lamport_clock', 0))
 
         for remote_operation in results:
 
@@ -83,11 +78,10 @@ class SyncManager:
                     self.lamport_clock.increment_lamport_time(remote_operation['lamport_clock'])
                     self.lamport_clock.save_lamport_time_to_db()
 
-                    responce = self.embedding_provider.embed(
+                    response = self.embedding_provider.embed(
                         f"{remote_operation['payload']['title']} {remote_operation['payload']['contents']} {remote_operation['payload']['tags']}")
 
-
-                    embeddings = pickle.dumps(responce['embedding'])
+                    embeddings = pickle.dumps(response['embedding'])
 
                     self.notes_repo.insert_note(remote_operation['uuid'], remote_operation['payload']['title'],
                                                 remote_operation['payload']['contents'], remote_operation['payload']['created_at'],
@@ -99,7 +93,7 @@ class SyncManager:
                     self.lexical_index.index_note_for_lexical_search(remote_operation['uuid'],
                                                                     remote_operation['payload'].get('title', ''),
                                                                     remote_operation['payload'].get('contents', ''))
-                    self.faiss_engine.add_embedding(remote_operation['uuid'], responce['embedding'])
+                    self.faiss_engine.add_embedding(remote_operation['uuid'], response['embedding'])
 
                     self.change_log.log_operation(remote_operation['uuid'],
                                                     "create", remote_operation['payload'], self.lamport_clock.now(),
@@ -110,7 +104,7 @@ class SyncManager:
                     logging.warning(f"Could not create note because a note with this id already exists. Note id : {remote_operation['uuid']}")
 
             if remote_operation['operation_type'] == 'update':
-                if local_note is not None:  # Use .get bacause parameters may not exist in update function.
+                if local_note is not None:  # Use .get because parameters may not exist in update function.
                     self.lamport_clock.increment_lamport_time(remote_operation['lamport_clock'])
                     self.lamport_clock.save_lamport_time_to_db()
                     self.notes_repo.update_note(remote_operation['uuid'],
@@ -124,8 +118,8 @@ class SyncManager:
                     note = self.notes_repo.get_note(remote_operation['uuid'])
                     self.lexical_index.index_note_for_lexical_search(note['uuid'], note['title'], note['contents'])
 
-                    responce = self.embedding_provider.embed(f"{note['title']} {note['contents']} {note['tags']}")
-                    self.faiss_engine.add_embedding(remote_operation['uuid'], responce['embedding'])
+                    response = self.embedding_provider.embed(f"{note['title']} {note['contents']} {note['tags']}")
+                    self.faiss_engine.add_embedding(remote_operation['uuid'], response['embedding'])
 
                     self.change_log.log_operation(remote_operation['uuid'],
                                                     "update", remote_operation['payload'], self.lamport_clock.now(),
@@ -148,9 +142,10 @@ class SyncManager:
                     self.update_last_sync()
                 else:
                     logging.warning(f"Could not delete note becuase a note with this id does not exist. Note id : {remote_operation['uuid']}")
+
     def sync(self):
         self.sync_up()
-        self.sync_down()
+        #self.sync_down()
 
 if __name__ == "__main__":
 
