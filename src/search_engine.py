@@ -39,7 +39,7 @@ class SearchEngine:
         result_scores = defaultdict(int)
 
         for token in query_tokens:
-            # Retreive all note UUIDs (and token frequency) that contain that token.
+            # Retrieve all note UUIDs (and token frequency) that contain that token.
             similar_tokens = self.notes_index.retrieve_similar_tokens(token)
 
             # Score the UUID by token count.
@@ -85,8 +85,8 @@ class SearchEngine:
 
     def semantic_search(self, user_query, neighbours=10):
 
-        responce = self.embedding_provider.embed(user_query)
-        embeddings = np.array(responce['embedding'])
+        response = self.embedding_provider.embed(user_query)
+        embeddings = np.array(response['embedding'])
         embeddings = embeddings.reshape(1, embeddings.shape[0])
 
         distances, indices = self.embedding_database.search(embeddings, neighbours)
@@ -95,7 +95,7 @@ class SearchEngine:
         indices = indices.flatten()
 
         if not self.embedding_database.faiss_to_uuid:
-            logging.warning("Semantic database is empty. Could not search semanticaly.")
+            logging.warning("Semantic database is empty. Could not search semantically.")
             return
 
         # If we find unretreived indices in the results store their positions.
@@ -115,8 +115,8 @@ class SearchEngine:
         semantic_results = self.semantic_search(user_query)
 
         if not lexical_results and semantic_results is None:
-            logging.warning("Could not perform hybid search, database is empty.")
-            return
+            logging.warning("Could not perform hybrid search, database is empty.")
+            return None
 
         def normalize_scores(results):
             min_score = min(results, key=lambda x: x[1])[1]
@@ -125,7 +125,7 @@ class SearchEngine:
 
             # Sometimes there is only one results or a tie between results
             # that would yield the min/max functions to return the same
-            # value causing a vivision by 0.
+            # value causing a division by 0.
             if min_score == max_score:
                 for note_id, _ in results:
                     normalized_scores[note_id] = 1.0
