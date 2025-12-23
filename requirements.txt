@@ -3,6 +3,6 @@ pytest
 wonderwords
 faiss-cpu
 ollama
-PyNaCl
+cryptography
 zeroconf
 requests
