@@ -18,7 +18,8 @@ def run_wizard():
                     download_installer(installer)
                     run_installer(installer)
             else:
-                subprocess.run(["curl -fsSL https://ollama.com/install.sh | sh"], shell=True, check=True)
+                curl_output = subprocess.run(["curl", "-fsSL", "https://ollama.com/install.sh"], capture_output=True, check=True)
+                subprocess.run(["sh"], input=curl_output.stdout)
         else:
             raise RuntimeError("Ollama is required to run. You can download it from: https://ollama.com/download")
     if not is_model_downloaded("nomic-embed-text"):
