@@ -3,8 +3,9 @@ import json
 
 class ChangeLog:
 
-    def __init__(self, db_worker):
+    def __init__(self, db_worker, device_id):
         self.db_worker = db_worker
+        self.device_id = device_id
 
     def create_change_log_table(self):
         def _op(connection):
@@ -28,12 +29,11 @@ class ChangeLog:
 
             cursor = connection.cursor()
             op_id = str(uuid.uuid4())
-            device_id = self.db.get_or_create_peer_id()
 
             cursor.execute("""
                     INSERT INTO change_log (op_id, note_id, operation_type, timestamp, device_id, payload, lamport_clock, origin_device)
                     VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?)""",
-                    (op_id, note_id, operation_type, device_id, json.dumps(payload), lamport_timestamp, origin_device))
+                    (op_id, note_id, operation_type, self.device_id, json.dumps(payload), lamport_timestamp, origin_device))
             connection.commit()
         self.db_worker.execute(_op, (note_id, operation_type, payload, lamport_timestamp, origin_device))
 
