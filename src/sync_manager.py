@@ -128,7 +128,7 @@ class SyncManager:
                     self.search_engine.index_note(remote_operation['note_id'])
 
                     note = self.notes_repo.get_note(remote_operation['note_id'])
-                    self.lexical_index.index_note_for_lexical_search(note['note_id'], note['title'], note['contents'])
+                    self.lexical_index.index_note_for_lexical_search(note['uuid'], note['title'], note['contents'])
 
                     response = self.embedding_provider.embed(f"{note['title']} {note['contents']} {note['tags']}")
                     self.faiss_engine.add_embedding(remote_operation['note_id'], response['embedding'])
