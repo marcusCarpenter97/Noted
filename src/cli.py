@@ -1,6 +1,5 @@
 import pickle
 import logging
-from database import Database
 from faiss_engine import Faiss
 from tokenizer import Tokenizer
 from note_index import NoteIndex
