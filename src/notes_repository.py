@@ -36,7 +36,7 @@ class NotesRepository:
             note_hash = compute_note_hash(title, contents, tags, embeddings, deleted=0)
             cursor.execute("INSERT INTO notes (uuid, title, contents, created_at, last_updated, embeddings, tags, note_hash) VALUES(?, ?, ?, ?, ?, ?, ?, ?)", (uuid, title, contents, created_at, last_updated, embeddings, tags, note_hash))
             connection.commit()
-        self.db_worker.execute(_op)
+        self.db_worker.execute(_op, args=(uuid, title, contents, created_at, last_updated, embeddings, tags), wait=True)
 
     def get_note(self, note_id):
         def _op(connection, note_id):
@@ -121,7 +121,7 @@ class NotesRepository:
                     """
             cursor.execute(query, (timestamp,))
             return cursor.fetchall()
-        self.db_worker.execute(_op, args=(timestamp,), wait=True)
+        return self.db_worker.execute(_op, args=(timestamp,), wait=True)
 
     def mark_note_as_deleted(self, note_id):
         def _op(connection, note_id):
