@@ -42,7 +42,7 @@ def main(db_worker, device_id, transport_layer):
     lexical_index = LexicalIndex(db_worker)
     lexical_index.create_lexical_table()
 
-    change_log = ChangeLog(db_worker)
+    change_log = ChangeLog(db_worker, device_id)
     change_log.create_change_log_table()
 
     faiss_engine = Faiss(embedding_prov, notes_db)
@@ -76,11 +76,12 @@ def main(db_worker, device_id, transport_layer):
             lexical_index.index_note_for_lexical_search(note_id, title, contents)
             faiss_engine.add_embedding(note_id, responce['embedding'])
 
-            note_as_json = {"title": title, "contents": contents, "embeddings": embeddings, "tags": tags}
+            # Convert the SQLite row object into a dictionary.
+            note_as_dict = dict(notes_db.get_note(note_id))
 
             lamport_clock.increment_lamport_time()
             lamport_clock.save_lamport_time_to_db()
-            change_log.log_operation(note_id, "create", note_as_json, lamport_clock.now(), device_id)
+            change_log.log_operation(note_id, "create", note_as_dict, lamport_clock.now(), device_id)
             print(f"You successfully entered a note with an ID of {note_id}")
 
         elif user_choice == '2':
@@ -195,10 +196,9 @@ if __name__ == "__main__":
         main(db_worker, device_id, transport_layer)
     except KeyboardInterrupt:
         logging.info("Shutting down...")
-    finally:
-        logging.info("\nClosing database ...")
+        logging.info("Closing database ...")
         db_worker.shutdown()
-        logging.info("Unregistering device ...\n")
+        logging.info("Unregistering device ...")
         advertiser.unregister_service(info)
         advertiser.close()
         discoverer.close()
