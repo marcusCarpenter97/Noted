@@ -44,7 +44,6 @@ class TransportLayer:
                 return
 
         pk = peer_data["public_key"]
-        logging.info(f"Received peer public key length: {len(pk)} bytes")
 
         self.peers.append(new_peer)
         self.service_name_to_device_id[peer_data["zeroconf_name"]] = peer_data["device_id"]
@@ -78,8 +77,7 @@ class TransportLayer:
                 sock.sendall(handshake_bytes)
 
                 changes = [dict(row) for row in changes_to_push]
-                message = {"type": "update", "changes": changes}
-                plaintext = pickle.dumps(message)
+                plaintext = pickle.dumps(changes)
 
                 iv = os.urandom(12)
                 encryptor = Cipher(algorithms.AES(self.symetric_keys[peer.device_id]), modes.GCM(iv)).encryptor()
