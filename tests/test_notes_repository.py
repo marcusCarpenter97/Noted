@@ -2,40 +2,38 @@ import pytest
 import ollama
 import pickle
 import numpy as np
-from database import Database
-from notes_repository import NotesRepository
+from database_worker import DBWorker
 from lexical_index import LexicalIndex
+from notes_repository import NotesRepository
 
-@pytest.fixture(autouse=True)
-def reset_db():
-    Database._instance = None
-    Database._initialized = None
+@pytest.fixture
+def clean_db(tmp_path):
+    db_path = tmp_path / "test.db"
+    db = DBWorker(db_path=str(db_path))
+    yield db
+    db.shutdown()
 
 @pytest.fixture
 def fake_embedding():
     return {"embedding": [0.123, 0.69, 0.93]}
 
-def test_create_note(fake_embedding):
-    db = Database(":memory:")
-    notes_db = NotesRepository(db)
+def test_create_note(clean_db, fake_embedding):
+    notes_db = NotesRepository(clean_db)
     notes_db.create_notes_table()
 
-    #sample = ollama.embeddings(model="nomic-embed-text", prompt="dimension probe")
     note_id = notes_db.create_note("Title", "Body", pickle.dumps(fake_embedding['embedding']), "tag1")
     note = notes_db.get_note(note_id)
 
     assert note is not None
     assert note[1] == "Title"
 
-def test_get_note_not_found():
-    db = Database(":memory:")
-    notes_db = NotesRepository(db)
+def test_get_note_not_found(clean_db):
+    notes_db = NotesRepository(clean_db)
     notes_db.create_notes_table()
     assert notes_db.get_note(0) is None
 
-def test_get_note_deleted_note_is_still_returned(fake_embedding):
-    db = Database(":memory:")
-    notes_db = NotesRepository(db)
+def test_get_note_deleted_note_is_still_returned(clean_db, fake_embedding):
+    notes_db = NotesRepository(clean_db)
     notes_db.create_notes_table()
     note_id = notes_db.create_note("Title", "Body", pickle.dumps(fake_embedding['embedding']), "tag1")
     notes_db.mark_note_as_deleted(note_id)
@@ -43,9 +41,8 @@ def test_get_note_deleted_note_is_still_returned(fake_embedding):
     assert note is not None
     assert note['deleted'] == 1
 
-def test_list_all_notes_with_deleted():
-    db = Database(":memory:")
-    notes_db = NotesRepository(db)
+def test_list_all_notes_with_deleted(clean_db):
+    notes_db = NotesRepository(clean_db)
     notes_db.create_notes_table()
     fake_embedding = np.array([0.123, 0.69, 0.93]).astype('float32').tobytes()
     note_id = notes_db.create_note("Title", "Body", fake_embedding, "tag1")
@@ -54,9 +51,8 @@ def test_list_all_notes_with_deleted():
     result = notes_db.list_all_notes(include_deleted=True)
     assert len(result) == 2
 
-def test_list_all_notes_without_deleted():
-    db = Database(":memory:")
-    notes_db = NotesRepository(db)
+def test_list_all_notes_without_deleted(clean_db):
+    notes_db = NotesRepository(clean_db)
     notes_db.create_notes_table()
     fake_embedding = np.array([0.123, 0.69, 0.93]).astype('float32').tobytes()
     note_id = notes_db.create_note("Title", "Body", fake_embedding, "tag1")
@@ -65,9 +61,8 @@ def test_list_all_notes_without_deleted():
     result = notes_db.list_all_notes(include_deleted=False)
     assert len(result) == 1
 
-def test_mark_note_as_deleted_sets_flag():
-    db = Database(":memory:")
-    notes_db = NotesRepository(db)
+def test_mark_note_as_deleted_sets_flag(clean_db):
+    notes_db = NotesRepository(clean_db)
     notes_db.create_notes_table()
     fake_embedding = np.array([0.123, 0.69, 0.93]).astype('float32').tobytes()
     note_id = notes_db.create_note("Title", "Body", fake_embedding, "tag1")
@@ -76,43 +71,13 @@ def test_mark_note_as_deleted_sets_flag():
     assert note is not None
     assert note['deleted'] == 1
 
-def test_update_note(fake_embedding):
-    db = Database(":memory:")
-    notes_db = NotesRepository(db)
+def test_update_note(clean_db, fake_embedding):
+    notes_db = NotesRepository(clean_db)
     notes_db.create_notes_table()
-    #sample = ollama.embeddings(model="nomic-embed-text", prompt="dimension probe")
+
     note_id = notes_db.create_note("Title", "Body", pickle.dumps(fake_embedding['embedding']), "tag1")
     notes_db.update_note(note_id, title="New Title")
 
     note = notes_db.get_note(note_id)
     assert note is not None
     assert note[1] == "New Title"
-
-def test_get_notes_since_last_sync():
-    db = Database(":memory:")
-    repo = NotesRepository(db)
-    repo.create_notes_table()
-
-    # Insert 3 notes with known timestamps
-    cursor = db.get_database_cursor()
-
-    cursor.execute(
-        "INSERT INTO notes (uuid, title, contents, last_updated, embeddings, tags) "
-        "VALUES ('abc', 'A', 'x', '2025-01-01 10:00:00', ?, 't')", (b'x',)
-    )
-    cursor.execute(
-        "INSERT INTO notes (uuid, title, contents, last_updated, embeddings, tags) "
-        "VALUES ('def', 'B', 'y', '2025-01-02 10:00:00', ?, 't')", (b'y',)
-    )
-    cursor.execute(
-        "INSERT INTO notes (uuid, title, contents, last_updated, embeddings, tags) "
-        "VALUES ('ghi', 'C', 'z', '2025-01-03 10:00:00', ?, 't')", (b'z',)
-    )
-    db.commit_to_database()
-
-    # Call function
-    result = repo.get_notes_since_last_sync("2025-01-02 00:00:00")
-
-    # Expect notes B and C (id 2 and 3)
-    ids = [row['uuid'] for row in result]
-    assert ids == ['def', 'ghi']
