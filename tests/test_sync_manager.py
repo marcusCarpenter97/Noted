@@ -1,3 +1,4 @@
+import json
 import pytest
 from unittest.mock import Mock
 from sync_manager import SyncManager
@@ -7,27 +8,10 @@ from sync_manager import SyncManager
 #   Minimal Fakes
 # ────────────────────────────────────────────────────────────────
 
-class FakeDB:
-    def __init__(self):
-        self.last_updated = "2000-01-01 00:00:00"
-
-    def get_database_cursor(self):
-        return self
-
-    def execute(self, query, params=()):
-        q = query.lower()
-        if "select last_updated" in q:
-            self._fetchone = (self.last_updated,)
-        if "update last_sync" in q:
-            self.last_updated = "3000-01-01 00:00:00"
-        return self
-
-    def fetchone(self):
-        return self._fetchone
-
-    def commit_to_database(self):
-        pass
-
+class FakeDBWorker:
+    def execute(self, fn, args=(), wait=False, kwargs=None):
+        if wait:
+            return "1970-01-01"
 
 class FakeNotesRepository:
     def __init__(self):
@@ -35,7 +19,7 @@ class FakeNotesRepository:
 
     def insert_note(self, uuid, title, contents, created_at, last_updated, embeddings, tags):
         self.notes[uuid] = {
-            "uuid": uuid,
+            "note_id": uuid,
             "title": title,
             "contents": contents,
             "created_at": created_at,
@@ -119,7 +103,7 @@ class FakeEmbeddings:
 # ────────────────────────────────────────────────────────────────
 
 def make_sync_manager():
-    db = FakeDB()
+    db_worker = FakeDBWorker()
     notes = FakeNotesRepository()
     clock = FakeLamportClock()
     change_log = FakeChangeLog()
@@ -130,9 +114,10 @@ def make_sync_manager():
     fe = Mock()
     ep = FakeEmbeddings()
     tl = Mock()
+    tl.register_message_handler = Mock()
 
     return SyncManager(
-        db=db,
+        db_worker=db_worker,
         device_id="DEVICE",
         notes_repository=notes,
         change_log=change_log,
@@ -154,17 +139,17 @@ def test_create_note_from_remote():
     #api.pull_result = [{
     message = [{
         "op_id": "1",
-        "uuid": "A",
+        "note_id": "A",
         "lamport_clock": 5,
         "operation_type": "create",
-        "payload": {
+        "payload": json.dumps({
             "title": "Hello",
             "contents": "World",
             "created_at": "2020",
             "last_updated": "2020",
             "embeddings": None,
             "tags": []
-        }
+        })
     }]
 
     sm, notes = make_sync_manager()
@@ -182,10 +167,10 @@ def test_update_note_from_remote():
 
     message = [{
         "op_id": "2",
-        "uuid": "A",
+        "note_id": "A",
         "lamport_clock": 10,
         "operation_type": "update",
-        "payload": {"title": "New Title"}
+        "payload": json.dumps({"title": "New Title"})
     }]
 
     sm.sync_down("A", message)
@@ -202,10 +187,10 @@ def test_delete_note_from_remote():
 
     message = [{
         "op_id": "3",
-        "uuid": "A",
+        "note_id": "A",
         "lamport_clock": 7,
         "operation_type": "delete",
-        "payload": {}
+        "payload": json.dumps({})
     }]
 
     sm.sync_down("A", message)
@@ -220,17 +205,17 @@ def test_multiple_operations_in_order():
     # 1. create
     message = [{
         "op_id": "4",
-        "uuid": "A",
+        "note_id": "A",
         "lamport_clock": 1,
         "operation_type": "create",
-        "payload": {
+        "payload": json.dumps({
             "title": "One",
             "contents": "X",
             "created_at": "t",
             "last_updated": "t",
             "embeddings": None,
             "tags": []
-        }
+        })
     }]
     sm.sync_down("A", message)
     assert notes.get_note("A")["title"] == "One"
@@ -238,10 +223,10 @@ def test_multiple_operations_in_order():
     # 2. update
     message = [{
         "op_id": "5",
-        "uuid": "A",
+        "note_id": "A",
         "lamport_clock": 2,
         "operation_type": "update",
-        "payload": {"title": "Two"}
+        "payload": json.dumps({"title": "Two"})
     }]
     sm.sync_down("A", message)
     assert notes.get_note("A")["title"] == "Two"
@@ -249,10 +234,10 @@ def test_multiple_operations_in_order():
     # 3. delete
     message = [{
         "op_id": "6",
-        "uuid": "A",
+        "note_id": "A",
         "lamport_clock": 3,
         "operation_type": "delete",
-        "payload": {}
+        "payload": json.dumps({})
     }]
     sm.sync_down("A", message)
     assert notes.get_note("A")["deleted"] is True
@@ -264,17 +249,17 @@ def test_idempotency_operation_not_replayed():
 
     message = [{
         "op_id": "7",
-        "uuid": "A",
+        "note_id": "A",
         "lamport_clock": 1,
         "operation_type": "create",
-        "payload": {
+        "payload": json.dumps({
             "title": "Title",
             "contents": "Body",
             "created_at": "t",
             "last_updated": "t",
             "embeddings": None,
             "tags": []
-        }
+        })
     }]
 
     sm.sync_down("A", message)
