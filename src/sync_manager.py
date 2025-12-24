@@ -1,6 +1,5 @@
 import logging
 import pickle
-from database import Database
 from change_log_repository import ChangeLog
 from notes_repository import NotesRepository
 from remote_api_client import RemoteAPIClient
@@ -146,23 +145,3 @@ class SyncManager:
     def sync(self):
         self.sync_up()
         #self.sync_down()
-
-if __name__ == "__main__":
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(message)s",
-        handlers=[
-            logging.FileHandler("debug.log"),
-            logging.StreamHandler()
-        ]
-    )
-
-    db = Database()
-    cl = ChangeLog(db)
-    cl.create_change_log_table()
-    nr = NotesRepository(db)
-    nr.create_notes_table()
-    rc = RemoteAPIClient()
-    sm = SyncManager(db, nr, rc)
-    sm.sync()

@@ -4,6 +4,7 @@ from database import Database
 from faiss_engine import Faiss
 from tokenizer import Tokenizer
 from note_index import NoteIndex
+from database_worker import DBWorker
 from sync_manager import SyncManager
 from lamport_clock import LamportClock
 from search_engine import SearchEngine
@@ -26,23 +27,23 @@ def print_note(note):
     print("Deleted: ", note['deleted'])
     print()
 
-def main(db, device_id, transport_layer):
+def main(db_worker, device_id, transport_layer):
 
     embedding_prov = EmbeddingProvider()
 
-    lamport_clock = LamportClock(db)
+    lamport_clock = LamportClock(db_worker)
     lamport_clock.initialize_lamport_clock()
 
-    notes_db = NotesRepository(db)
+    notes_db = NotesRepository(db_worker)
     notes_db.create_notes_table()
 
-    note_index = NoteIndex(db)
+    note_index = NoteIndex(db_worker)
     note_index.create_word_index_table()
 
-    lexical_index = LexicalIndex(db)
+    lexical_index = LexicalIndex(db_worker)
     lexical_index.create_lexical_table()
 
-    change_log = ChangeLog(db)
+    change_log = ChangeLog(db_worker)
     change_log.create_change_log_table()
 
     faiss_engine = Faiss(embedding_prov, notes_db)
@@ -51,7 +52,7 @@ def main(db, device_id, transport_layer):
 
     search_engine = SearchEngine(notes_db, note_index, lexical_index, faiss_engine, embedding_prov, tokenizer)
 
-    synchronization_manager = SyncManager(db, device_id, notes_db,
+    synchronization_manager = SyncManager(db_worker, device_id, notes_db,
                                           change_log, lamport_clock,
                                           search_engine, lexical_index,
                                           faiss_engine, embedding_prov,
@@ -178,9 +179,9 @@ if __name__ == "__main__":
 
     device_name = input("New device detected. Enter device name: ")
 
-    db = Database()
+    db_worker = DBWorker()
 
-    device = DeviceID(db)
+    device = DeviceID(db_worker)
     device_id = device.get_or_generate_device_id()
     private_key, public_key = device.get_or_generate_public_private_keys()
 
@@ -192,11 +193,13 @@ if __name__ == "__main__":
 
     try:
         run_wizard()
-        main(db, device_id, transport_layer)
+        main(db_worker, device_id, transport_layer)
     except KeyboardInterrupt:
-        print("\nClosing database ...")
-        db.close_database_connection()
-        print("Unregistering device ...\n")
+        logging.info("Shutting down...")
+    finally:
+        logging.info("\nClosing database ...")
+        db_worker.shutdown()
+        logging.info("Unregistering device ...\n")
         advertiser.unregister_service(info)
         advertiser.close()
         discoverer.close()
