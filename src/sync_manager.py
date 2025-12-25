@@ -94,7 +94,6 @@ class SyncManager:
                 for i in range(0, len(operations), batch_size):
                     batch = operations[i : i + batch_size]
                     result = self.transport_layer.push_changes(batch)
-                    logging.info(result)
             except Exception as e:
                 logging.error(f"Failed to push changes to peer {peer.device_id}: %s", e)
                 return
@@ -106,8 +105,6 @@ class SyncManager:
     def sync_down(self, peer_device_id, message):
         """ Pull new changes from peers. """
         last_sync_at = self.get_last_sync()
-
-        logging.info(f"Received {len(message)} notes from {peer_device_id}")
 
         results = sorted(message, key=lambda x: x.get('lamport_clock', 0))
 
