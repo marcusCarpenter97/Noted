@@ -42,3 +42,22 @@ class ChangeLog:
             cursor = connection.cursor()
             cursor.execute("SELECT EXISTS (SELECT 1 FROM change_log WHERE op_id = ?) AS value_exists", (operation_id,))
             return cursor.fetchone()['value_exists']
+        return self.db_worker.execute(_op, (operation_id,), wait=True)
+
+    def get_operations_since_timestamp(self, timestamp):
+        def _op(connection, timestamp):
+            cursor = connection.cursor()
+            query = """
+                    SELECT * FROM change_log WHERE timestamp > ? ORDER BY timestamp ASC
+                    """
+            cursor.execute(query, (timestamp,))
+            return cursor.fetchall()
+        return self.db_worker.execute(_op, args=(timestamp,), wait=True)
+
+    def get_operation_since_lamport(self, lamport_stamp):
+        def _op(connection, lamport_stamp):
+            cursor = connection.cursor()
+            query = "SELECT * FROM change_log WHERE lamport_clock > ? ORDER BY lamport_clock ASC"
+            cursor.execute(query, (lamport_stamp,))
+            return cursor.fetchall()
+        return self.db_worker.execute(_op, args=(lamport_stamp,), wait=True)
