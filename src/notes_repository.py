@@ -113,16 +113,6 @@ class NotesRepository:
             connection.commit()
         return self.db_worker.execute(_op, args=(note_id, title, contents, embeddings, tags), wait=True)
 
-    def get_operations_since(self, timestamp):
-        def _op(connection, timestamp):
-            cursor = connection.cursor()
-            query = """
-                    SELECT * FROM change_log WHERE timestamp > ? ORDER BY timestamp ASC
-                    """
-            cursor.execute(query, (timestamp,))
-            return cursor.fetchall()
-        return self.db_worker.execute(_op, args=(timestamp,), wait=True)
-
     def mark_note_as_deleted(self, note_id):
         def _op(connection, note_id):
             cursor = connection.cursor()
