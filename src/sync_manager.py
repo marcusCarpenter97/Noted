@@ -52,22 +52,50 @@ class SyncManager:
             return cursor.fetchone()[0]
         return self.db_worker.execute(_op, wait=True)
 
-    def sync_up(self, batch_size=50):
-        """ Send new changes to the server. """
-        last_sync_at = self.get_last_sync()
-        operations = self.notes_repo.get_operations_since(last_sync_at)
+    def create_lamport_last_sync_table(self):
+        def _op(connection):
+            cursor = connection.cursor()
+            cursor.execute("""CREATE TABLE IF NOT EXISTS last_lamport_sync (
+                                peer_device_id TEXT PRIMARY KEY,
+                                last_lamport INTEGER NOT NULL)""")
+        self.db_worker.execute(_op)
 
-        try:
-            for i in range(0, len(operations), batch_size):
-                batch = operations[i : i + batch_size]
-                result = self.transport_layer.push_changes(batch)
-                logging.info(result)
-        except Exception as e:
-            logging.error(f"Failed to push changes: %s", e)
-            return
+    def insert_peer_into_lamport_last_sync(self, peer_id, lamport_time):
+        def _op(connection):
+            cursor = connection.cursor()
+            cursor.execute("INSERT OR REPLACE INTO last_lamport_sync (peer_device_id, last_lamport) VALUES (?, ?)", (peer_id, lamport_time))
+            connection.commit()
+        self.db_worker.execute(_op, args=(peer_id, lamport_time), wait=True)
+
+    def get_peer_lampot_last_sync(self, peer_id):
+        def _op(connection, peer_id):
+            cursor = connection.cursor()
+            cursor.execute("SELECT last_lamport FROM last_lamport_sync WHERE peer_device_id = ?", (peer_id,))
+            return cursor.featchone()
+        return self.db_worker.execute(_op, args=(peer_id,), wait=True)
+
+    def sync_up(self, batch_size=50):  # TODO test this.
+        """ Send new changes to peers. """
+        peers = self.transport_layer.get_peers()
+
+        for peer in peers:
+            last_lamport_sync_with_peer = self.get_peer_lampot_last_sync(peer.device_id)
+            operations = self.change_log.get_operation_since_lamport(last_lamport_sync_with_peer)
+            max_lamport = max(operations, lambda x: x["lamport_clock"])
+            try:
+                for i in range(0, len(operations), batch_size):
+                    batch = operations[i : i + batch_size]
+                    result = self.transport_layer.push_changes(batch)
+                    logging.info(result)
+            except Exception as e:
+                logging.error(f"Failed to push changes to peer {peer.device_id}: %s", e)
+                return
+            else:
+                self.update_last_sync()
+                self.insert_peer_into_lamport_last_sync(peer.device_id, max_lamport)
 
     def sync_down(self, peer_device_id, message):
-        """ Pull new changes from the server. """
+        """ Pull new changes from peers. """
         last_sync_at = self.get_last_sync()
 
         logging.info(f"Received from peer {message}")
@@ -77,6 +105,7 @@ class SyncManager:
 
         for remote_operation in results:
 
+            # Skip operation if we already seen it.
             if self.change_log.check_operation_exists(remote_operation['op_id']) == 1:
                 continue
 
@@ -84,7 +113,7 @@ class SyncManager:
 
             local_note = self.notes_repo.get_note(remote_note_id)
 
-            # Payload comes as a string and need to be convereted to a dictionary.
+            # Payload comes as a string and needs to be convereted to a dictionary.
             remote_operation["payload"] = json.loads(remote_operation["payload"])
 
             if remote_operation['operation_type'] == 'create':
