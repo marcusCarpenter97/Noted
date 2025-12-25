@@ -61,7 +61,7 @@ class SyncManager:
         self.db_worker.execute(_op)
 
     def insert_peer_into_lamport_last_sync(self, peer_id, lamport_time):
-        def _op(connection):
+        def _op(connection, peer_id, lamport_time):
             cursor = connection.cursor()
             cursor.execute("INSERT OR REPLACE INTO last_lamport_sync (peer_device_id, last_lamport) VALUES (?, ?)", (peer_id, lamport_time))
             connection.commit()
@@ -71,17 +71,23 @@ class SyncManager:
         def _op(connection, peer_id):
             cursor = connection.cursor()
             cursor.execute("SELECT last_lamport FROM last_lamport_sync WHERE peer_device_id = ?", (peer_id,))
-            return cursor.featchone()
+            result = cursor.fetchone()
+            if result:
+                return result[0]
+            return 0
         return self.db_worker.execute(_op, args=(peer_id,), wait=True)
 
-    def sync_up(self, batch_size=50):  # TODO test this.
+    def sync_up(self, batch_size=50):
         """ Send new changes to peers. """
         peers = self.transport_layer.get_peers()
 
         for peer in peers:
             last_lamport_sync_with_peer = self.get_peer_lampot_last_sync(peer.device_id)
             operations = self.change_log.get_operation_since_lamport(last_lamport_sync_with_peer)
-            max_lamport = max(operations, lambda x: x["lamport_clock"])
+            max_lamport = 0
+            if operations:
+                max_lamport = max(operations, key=lambda x: x["lamport_clock"])["lamport_clock"]
+
             try:
                 for i in range(0, len(operations), batch_size):
                     batch = operations[i : i + batch_size]
@@ -92,13 +98,13 @@ class SyncManager:
                 return
             else:
                 self.update_last_sync()
+                max_lamport = max(last_lamport_sync_with_peer, max_lamport)
                 self.insert_peer_into_lamport_last_sync(peer.device_id, max_lamport)
 
     def sync_down(self, peer_device_id, message):
         """ Pull new changes from peers. """
         last_sync_at = self.get_last_sync()
 
-        logging.info(f"Received from peer {message}")
         logging.info(f"Received {len(message)} notes from {peer_device_id}")
 
         results = sorted(message, key=lambda x: x.get('lamport_clock', 0))
