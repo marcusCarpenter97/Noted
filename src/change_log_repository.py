@@ -23,19 +23,20 @@ class ChangeLog:
             connection.commit()
         self.db_worker.execute(_op)
 
-    def log_operation(self, note_id, operation_type, payload, lamport_timestamp, origin_device):
-        def _op(connection, note_id, operation_type, payload, lamport_timestamp, origin_device):
+    def log_operation(self, note_id, operation_type, payload, lamport_timestamp, origin_device, op_id=None):
+        def _op(connection, note_id, operation_type, payload, lamport_timestamp, origin_device, op_id):
             payload.pop("embeddings", None)
 
             cursor = connection.cursor()
-            op_id = str(uuid.uuid4())
+            if op_id is None:
+                op_id = str(uuid.uuid4())
 
             cursor.execute("""
                     INSERT INTO change_log (op_id, note_id, operation_type, timestamp, device_id, payload, lamport_clock, origin_device)
                     VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?)""",
                     (op_id, note_id, operation_type, self.device_id, json.dumps(payload), lamport_timestamp, origin_device))
             connection.commit()
-        self.db_worker.execute(_op, (note_id, operation_type, payload, lamport_timestamp, origin_device))
+        self.db_worker.execute(_op, (note_id, operation_type, payload, lamport_timestamp, origin_device, op_id))
 
     def check_operation_exists(self, operation_id):
         def _op(connection, operation_id):

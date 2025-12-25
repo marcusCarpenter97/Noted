@@ -86,6 +86,8 @@ class SyncManager:
             operations = self.change_log.get_operation_since_lamport(last_lamport_sync_with_peer)
             max_lamport = 0
             if operations:
+                # Remove operations that are not from this device.
+                operations = [op for op in operations if op["device_id"] == self.device_id]
                 max_lamport = max(operations, key=lambda x: x["lamport_clock"])["lamport_clock"]
 
             try:
@@ -144,9 +146,8 @@ class SyncManager:
                                                                     remote_operation['payload'].get('contents', ''))
                     self.faiss_engine.add_embedding(remote_note_id, response['embedding'])
 
-                    self.change_log.log_operation(remote_operation['op_id'],
-                                                    "create", remote_operation['payload'], self.lamport_clock.now(),
-                                                    self.device_id)
+                    self.change_log.log_operation(remote_note_id, "create", remote_operation['payload'], self.lamport_clock.now(),
+                                                    peer_device_id, remote_operation['op_id'])
                     logging.info(f"Inserted note from remote with id: {remote_note_id}")
                     self.update_last_sync()
                 else:
@@ -170,13 +171,12 @@ class SyncManager:
                     response = self.embedding_provider.embed(f"{note['title']} {note['contents']} {note['tags']}")
                     self.faiss_engine.add_embedding(remote_note_id, response['embedding'])
 
-                    self.change_log.log_operation(remote_operation['op_id'],
-                                                    "update", remote_operation['payload'], self.lamport_clock.now(),
-                                                    self.device_id)
+                    self.change_log.log_operation(remote_note_id, "update", remote_operation['payload'], self.lamport_clock.now(),
+                                                    peer_device_id, remote_operation['op_id'])
                     logging.info(f"Succesfully updated note with id: {remote_note_id}")
                     self.update_last_sync()
                 else:
-                    logging.warning(f"Could not update note becuase a note with this id does not exist. Note id : {remote_note_id}")
+                    logging.warning(f"Could not update note because a note with this id does not exist. Note id : {remote_note_id}")
 
             if remote_operation['operation_type'] == 'delete':
                 if local_note is not None:
@@ -186,11 +186,11 @@ class SyncManager:
                     self.lexical_index.delete_note_from_lexical_search(remote_note_id)
                     self.search_engine.remove_from_index(remote_note_id)
                     self.faiss_engine.delete_embedding(remote_note_id)
-                    self.change_log.log_operation(remote_operation['op_id'], "delete", {'deleted': 1}, self.lamport_clock.now(), self.device_id)
+                    self.change_log.log_operation(remote_note_id, "delete", {'deleted': 1}, self.lamport_clock.now(), peer_device_id, remote_operation['op_id'])
                     logging.info(f"Marked note for deletion with id: {remote_note_id}")
                     self.update_last_sync()
                 else:
-                    logging.warning(f"Could not delete note becuase a note with this id does not exist. Note id : {remote_note_id}")
+                    logging.warning(f"Could not delete note because a note with this id does not exist. Note id : {remote_note_id}")
 
     def sync(self):
         self.sync_up()
