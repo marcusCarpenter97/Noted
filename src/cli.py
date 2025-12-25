@@ -57,6 +57,10 @@ def main(db_worker, device_id, transport_layer):
                                           faiss_engine, embedding_prov,
                                           transport_layer)
 
+    synchronization_manager.create_last_sync_table()
+    synchronization_manager.initialize_sync_table()
+    synchronization_manager.create_lamport_last_sync_table()
+
     while True:
         user_choice = input(
             "Choose an option:\n1. Enter a new note\n2. Search for a note\n3. Edit a note\n4. Delete a note\n5. List all\n6. Sync\nYour choice: ")
