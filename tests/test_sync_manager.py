@@ -99,7 +99,7 @@ class FakeChangeLog:
     def check_operation_exists(self, op_id):
         return 1 if op_id in self.ops else 0
 
-    def log_operation(self, op_id, op_type, payload, ts, origin):
+    def log_operation(self, note_id, op_type, payload, ts, origin, op_id):
         self.ops[op_id] = True
 
 
@@ -327,7 +327,7 @@ def test_sync_up_batches_operations(mocker):
     transport = mocker.Mock()
     transport.get_peers.return_value = [peer]
 
-    ops = [{"lamport_clock": i} for i in range(120)]
+    ops = [{"lamport_clock": i, "device_id": "DEVICE"} for i in range(120)]
 
     change_log = mocker.Mock()
     change_log.get_operation_since_lamport.return_value = ops
@@ -349,9 +349,9 @@ def test_sync_up_updates_last_lamport(mocker):
     transport.get_peers.return_value = [peer]
 
     ops = [
-        {"lamport_clock": 5},
-        {"lamport_clock": 10},
-        {"lamport_clock": 7},
+        {"lamport_clock": 5, "device_id": "DEVICE"},
+        {"lamport_clock": 10, "device_id": "DEVICE"},
+        {"lamport_clock": 7, "device_id": "DEVICE"},
     ]
 
     change_log = mocker.Mock()
@@ -377,7 +377,7 @@ def test_sync_up_does_not_update_on_failure(mocker):
     transport.push_changes.side_effect = Exception("network error")
 
     change_log = mocker.Mock()
-    change_log.get_operation_since_lamport.return_value = [{"lamport_clock": 1}]
+    change_log.get_operation_since_lamport.return_value = [{"lamport_clock": 1, "device_id": "DEVICE"}]
 
     sm, _ = make_sync_manager(
         mocker,
