@@ -63,6 +63,9 @@ class TransportLayer:
         self.peers = [peer for peer in self.peers if peer.device_id != peer_id_to_remove]
         logging.info("Removed %s from peers.", peer_id_to_remove)
 
+    def get_peers(self):
+        return self.peers
+
     def push_changes(self, changes_to_push):
         results = []
 
