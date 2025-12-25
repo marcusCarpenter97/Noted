@@ -9,7 +9,7 @@ services:
       OLLAMA_HOST: http://host.docker.internal:11434
       DB_PATH: /data/database.db
     volumes:
-      - noted_device_a:/data
+      - device_a:/data
     networks:
       - mdns_net
 
@@ -22,7 +22,7 @@ services:
       OLLAMA_HOST: http://host.docker.internal:11434
       DB_PATH: /data/database.db
     volumes:
-      - noted_device_b:/data
+      - device_b:/data
     networks:
       - mdns_net
 
@@ -31,5 +31,5 @@ networks:
     driver: bridge
 
 volumes:
-  noted_device_a:
-  noted_device_b:
+  device_a:
+  device_b:
