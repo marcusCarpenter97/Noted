@@ -7,3 +7,4 @@ cryptography
 zeroconf
 requests
 pytest-mock
+PySide6
