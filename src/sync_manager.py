@@ -3,7 +3,6 @@ import logging
 import pickle
 from change_log_repository import ChangeLog
 from notes_repository import NotesRepository
-from remote_api_client import RemoteAPIClient
 
 class SyncManager:
 
