@@ -64,49 +64,6 @@ def test_index_note(clean_db, fake_embedding, emb_prov):
     tokens = ni.retrieve_tokens_for_note(note_id)
     assert len(tokens) == 3  # Three words in the test data.
 
-#def test_query_on_10k_notes():
-#    db = Database(BASE_DIR / "database" / "ten_thousand_notes.db")
-#
-#    li = LexicalIndex(clean_db)
-#    li.create_lexical_table()
-#    nr = NotesRepository(clean_db)
-#
-#    # Query one thousand random notes from the database.
-#    random_note_ids = random.sample(range(1, 10000), 1000)  # TODO sample existing uuids
-#
-#    start = time.perf_counter()
-#
-#    for note_id in random_note_ids:
-#        _ = nr.get_note(note_id)
-#
-#    end = time.perf_counter()
-#
-#    assert (end-start) <= 0.2
-#    assert ((end-start)/1000) <= 0.00005
-#
-#def test_index_note_on_1k_notes(emb_prov):
-#    db = Database(BASE_DIR / "database" / "one_thousand_notes.db")
-#
-#    li = LexicalIndex(clean_db)
-#    li.create_lexical_table()
-#    nr = NotesRepository(clean_db)
-#    ni = NoteIndex(clean_db)
-#    ni.create_word_index_table()
-#    tk = Tokenizer()
-#
-#    fe = Faiss(emb_prov, nr)
-#
-#    se = SearchEngine(nr, ni, li, fe, emb_prov, tk)
-#
-#    start = time.perf_counter()
-#
-#    for note_id in range(1, 1001):
-#        se.index_note(note_id)
-#
-#    end = time.perf_counter()
-#
-#    assert (end-start) < 1
-
 def make_engine():
     notes_repo = Mock()
     notes_index = Mock()
