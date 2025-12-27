@@ -8,7 +8,7 @@ from sync_manager import SyncManager
 from lamport_clock import LamportClock
 from search_engine import SearchEngine
 from lexical_index import LexicalIndex
-from installation_wizard import run_wizard
+from installation_wizard_cli import run_wizard_cli
 from device_identification import DeviceID
 from transport_layer import TransportLayer
 from change_log_repository import ChangeLog
@@ -196,7 +196,7 @@ if __name__ == "__main__":
     discoverer = discover(device_id, transport_layer)
 
     try:
-        run_wizard()
+        run_wizard_cli()
         main(db_worker, device_id, transport_layer)
     except KeyboardInterrupt:
         logging.info("Shutting down...")
