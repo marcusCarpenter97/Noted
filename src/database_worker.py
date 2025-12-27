@@ -3,6 +3,7 @@ import queue
 import sqlite3
 import logging
 import threading
+from pathlib import Path
 
 DATABASE_PATH = os.environ.get("DB_PATH", 'database/database.db')
 
@@ -14,6 +15,9 @@ class DBWorker:
         self.thread.start()
 
     def _run(self):
+        if not os.path.isdir(self.db_path):
+            path = Path(self.db_path)
+            path.parent.mkdir(parents=True, exist_ok=True)
         self.connection = sqlite3.connect(self.db_path)
         self.connection.row_factory = sqlite3.Row
         logging.info("Database worker thread started.")
