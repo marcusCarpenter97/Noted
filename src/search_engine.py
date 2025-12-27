@@ -19,7 +19,7 @@ class SearchEngine:
             logging.error(f"Could not index node with ID {note_id} because it does not exist.")
             return
 
-        note_text = f"{note['title']} {note['contents']} {note['tags']}"  # TODO should tags be split? They are comma separated.
+        note_text = f"{note['title']} {note['contents']} {note['tags']}"
         tokens = self.tokenizer.tokenize(note_text)
         token_count = self.tokenizer.count(tokens)
         
