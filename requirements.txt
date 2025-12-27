@@ -8,3 +8,4 @@ zeroconf
 requests
 pytest-mock
 PySide6
+pytest-qt
