@@ -276,6 +276,9 @@ class MainWindow(QWidget):
         QMessageBox.information(self, "Note created!", "You created a new note.")
 
     def delete_a_note(self):
+        # No note selected, do nothing.
+        if self.current_note_id == "":
+            return
         self.app.notes_db.mark_note_as_deleted(self.current_note_id)
         self.app.lexical_index.delete_note_from_lexical_search(self.current_note_id)
         self.app.search_engine.remove_from_index(self.current_note_id)
@@ -287,6 +290,10 @@ class MainWindow(QWidget):
         QMessageBox.information(self, "Note deleted!", "You deleted a note.")
 
     def edit_a_note(self):
+        # No note selected, do nothing.
+        if self.current_note_id == "":
+            return
+
         title = self.title_field.text().strip()
         contents = self.contents_field.toPlainText().strip()
         tags = self.tags_field.text().strip()
@@ -360,6 +367,7 @@ class App:
             )
             if ok_pressed and text.strip():
                 self.device.store_device_name(text.strip())
+                self.device_name = text.strip()
 
         self.transport_layer = TransportLayer(self.device_id, self.public_key, self.private_key)
         self.transport_layer.run_tcp_server()
