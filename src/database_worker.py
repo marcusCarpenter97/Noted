@@ -3,7 +3,6 @@ import queue
 import sqlite3
 import logging
 import threading
-#from database import DATABASE_PATH
 
 DATABASE_PATH = os.environ.get("DB_PATH", 'database/database.db')
 
