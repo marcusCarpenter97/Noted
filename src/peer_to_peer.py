@@ -11,6 +11,7 @@ class ServiceListener:
         self.transport_layer = transport_layer
 
     def add_service(self, zeroconf, service_type, name):
+        logging.info(f"[+] Service added: {name}")
         info = zeroconf.get_service_info(service_type, name)
 
         if not info:
@@ -25,7 +26,7 @@ class ServiceListener:
         properties["peer_port"] = info.port
         properties["zeroconf_name"] = name
 
-        self.transport_layer.register_new_peer(properties)
+        self.transport_layer.discover_peer(properties)
 
     def remove_service(self, zeroconf, service_type, name):
         logging.info(f"[-] Service removed: {name}")
