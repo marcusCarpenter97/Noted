@@ -55,3 +55,28 @@ class DeviceID:
 
             return private, public
         return self.db_worker.execute(_op, wait=True)
+
+    def create_device_name_table(self):
+        def _op(connection):
+            cursor = connection.cursor()
+            cursor.execute("CREATE TABLE IF NOT EXISTS device_name(name TEXT PRIMARY KEY)")
+            connection.commit()
+        self.db_worker.execute(_op, wait=True)
+
+    def store_device_name(self, device_name):
+        def _op(connection, device_name):
+            cursor = connection.cursor()
+            cursor.execute("INSERT INTO device_name (name) VALUES (?)", (device_name,))
+            connection.commit()
+        self.db_worker.execute(_op, args=(device_name,), wait=True)
+
+    def get_device_name(self):
+        def _op(connection):
+            cursor = connection.cursor()
+            cursor.execute("SELECT name FROM device_name")
+            row = cursor.fetchone()
+
+            if row:
+                return row["name"]
+            return None
+        return self.db_worker.execute(_op, wait=True)
