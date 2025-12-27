@@ -5,6 +5,7 @@ import pickle
 import logging
 import threading
 from dataclasses import dataclass
+from PySide6.QtCore import QObject, Signal
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -19,8 +20,12 @@ class PeerInfo:
     port: int
     zeroconf_name: str
 
-class TransportLayer:
+class TransportLayer(QObject):
+
+    peer_discovered = Signal(dict)
+
     def __init__(self, device_id, public_key, private_key):
+        super().__init__()
         self.peers = []
         self.device_id = device_id
         self.public_key = public_key
@@ -30,6 +35,17 @@ class TransportLayer:
         self.service_name_to_device_id = dict()  # This keeps track of peer names for removal.
         self.shared_secrets = dict()  # Maps peer device id to a shared secret.
         self.symetric_keys = dict()  # Maps peer device id to symetric keys.
+
+    def discover_peer(self, peer_data):
+        peer_device_id = peer_data["device_id"]
+
+        if peer_device_id == self.device_id:
+            return
+
+        if peer_device_id in self.peers_public_keys:
+            return
+
+        self.peer_discovered.emit(peer_data)
 
     def register_new_peer(self, peer_data):
 
