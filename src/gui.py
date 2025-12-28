@@ -340,7 +340,7 @@ class MainWindow(QWidget):
 
     def confirm_peer(self, peer_data):
         self.peer_dialog = ConfirmPeerDialog(f"Accept new connection from peer with name: {peer_data['zeroconf_name']}?", parent=self)
-        return self.peer_dialog.exec() == QDialog.Accept
+        return self.peer_dialog.exec() == QDialog.Accepted
 
     def on_peer_discovered(self, peer_data):
         if self.confirm_peer(peer_data):
