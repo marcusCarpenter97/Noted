@@ -65,7 +65,7 @@ And the CLI version (mainly used for testing) by calling:
 
 `python src/cli.py`
 
-*Remember to make sure Ollama is running.*
+**Remember to make sure Ollama is running.**
 
 Also keep in mind that the CLI does not have proper sync features, it will
 attempt to synchronize with every device found without proper authentication.
