@@ -67,6 +67,9 @@ And the CLI version (mainly used for testing) by calling:
 
 **Remember to make sure Ollama is running.**
 
+Running the app will create a log file called noted and a folder called
+database in the same directory as from where you ran the executable.
+
 Also keep in mind that the CLI does not have proper sync features, it will
 attempt to synchronize with every device found without proper authentication.
 This can lead to malicious behaviour, i.e. a malicious actor with a version of
