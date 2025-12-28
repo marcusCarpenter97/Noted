@@ -87,7 +87,9 @@ peer synchronization.
 To run the Docker images run the commands:
 
 `docker compose build`
+
 `docker compose run --rm advertiser`
+
 `docker compose run --rm listener`
 
 Note: this will run in CLI mode.
