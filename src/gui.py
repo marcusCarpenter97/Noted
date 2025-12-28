@@ -436,7 +436,7 @@ def shutdown(app):
 
 if __name__ == "__main__":
 
-    logging.basicConfig(handlers=[logging.StreamHandler(), logging.FileHandler("noted.log")],
+    logging.basicConfig(handlers=[logging.FileHandler("noted.log")],
                         level=logging.INFO,
                         format="%(asctime)s - %(levelname)s - %(message)s")
 
