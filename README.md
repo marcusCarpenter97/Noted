@@ -55,7 +55,8 @@ Don`t forget to install the model:
 
 ## Running the app
 
-An executable should be packaged in with the project and available here:
+An executable should be packaged in with the project and available
+[here](https://github.com/marcusCarpenter97/Noted/releases/download/1.0.1/Noted.exe).
 
 However, it is possible to run the GUI version by calling:
 
