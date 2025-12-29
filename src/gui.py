@@ -224,7 +224,7 @@ class MainWindow(QWidget):
 
         user_query = self.search_bar.text().strip()
 
-        # TODO Searching with an empty string crashes the programme in the
+        # Searching with an empty string crashes the programme in the
         # faiss engine (maybe only on an empty database).
         if user_query == "":
             return
@@ -275,6 +275,10 @@ class MainWindow(QWidget):
 
         QMessageBox.information(self, "Note created!", "You created a new note.")
 
+        self.title_field.clear()
+        self.contents_field.clear()
+        self.tags_field.clear()
+
     def delete_a_note(self):
         # No note selected, do nothing.
         if self.current_note_id == "":
@@ -288,6 +292,7 @@ class MainWindow(QWidget):
         self.app.change_log.log_operation(self.current_note_id, "delete", {"deleted": 1}, self.app.lamport_clock.now(), self.app.device_id)
         self.app.synchronization_manager.sync()
         QMessageBox.information(self, "Note deleted!", "You deleted a note.")
+        # TODO refresh the text boxes to be clear, and remove note from search bar.
 
     def edit_a_note(self):
         # No note selected, do nothing.
@@ -430,6 +435,7 @@ def exception_hook(exc_type, exc_value, exc_traceback):
 def shutdown(app):
     logging.info("Shutting down app...")
     app.db_worker.shutdown()
+    # TODO send logout signal to peers.
     app.advertiser.unregister_service(app.info)
     app.advertiser.close()
     app.discoverer.close()
