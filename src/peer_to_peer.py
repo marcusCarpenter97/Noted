@@ -34,6 +34,22 @@ class ServiceListener:
 
     def update_service(self, zeroconf, service_type, name):
         logging.info(f"[~] Service updated: {name}")
+        info = zeroconf.get_service_info(service_type, name)
+
+        if not info:
+            return
+
+        properties = self.decode_dict(info.properties)
+
+        if properties["device_id"] == self.device_id:
+            return
+
+        properties["peer_ip"] = socket.inet_ntoa(info.addresses[0])
+        properties["peer_port"] = info.port
+        properties["zeroconf_name"] = name
+
+        self.transport_layer.remove_service(name)
+        self.transport_layer.discover_peer(properties)
 
     def decode_dict(self, d):
         decoded = {}

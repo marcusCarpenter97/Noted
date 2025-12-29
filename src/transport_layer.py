@@ -73,10 +73,17 @@ class TransportLayer(QObject):
 
     def remove_service(self, service_name):
         peer_id_to_remove = self.service_name_to_device_id.pop(service_name, None)
+
         if peer_id_to_remove is None:
             logging.warning("Removing unregistered device with name %s", service_name)
             return
+
         self.peers = [peer for peer in self.peers if peer.device_id != peer_id_to_remove]
+
+        self.peers_public_keys.pop(peer_id, None)
+        self.shared_secrets.pop(peer_id, None)
+        self.symetric_keys.pop(peer_id, None)
+
         logging.info("Removed %s from peers.", peer_id_to_remove)
 
     def get_peers(self):
