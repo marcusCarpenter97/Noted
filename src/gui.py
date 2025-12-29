@@ -292,7 +292,12 @@ class MainWindow(QWidget):
         self.app.change_log.log_operation(self.current_note_id, "delete", {"deleted": 1}, self.app.lamport_clock.now(), self.app.device_id)
         self.app.synchronization_manager.sync()
         QMessageBox.information(self, "Note deleted!", "You deleted a note.")
-        # TODO refresh the text boxes to be clear, and remove note from search bar.
+
+        self.title_field.clear()
+        self.contents_field.clear()
+        self.tags_field.clear()
+
+        self.clear_results()
 
     def edit_a_note(self):
         # No note selected, do nothing.
