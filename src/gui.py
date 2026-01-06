@@ -310,6 +310,10 @@ class MainWindow(QWidget):
 
         old_note = self.app.notes_db.get_note(self.current_note_id)
 
+        # Can't edit note if it has been deleted.
+        if old_note["deleted"] == 1:
+            return
+
         change_as_json = {}
         # Build the change log with only what's changed.
         if title is not None:
