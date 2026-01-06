@@ -97,3 +97,7 @@ To run the Docker images run the commands:
 `docker compose run --rm listener`
 
 Note: this will run in CLI mode.
+
+To compile the Python code into an executable use he following command:
+
+`pyinstaller --onefile --icon="assets/noted-logo.ico" src/gui.py`
