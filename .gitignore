@@ -8,3 +8,6 @@ venv/
 src/__pycache__/
 tests/__pycache__/
 last_sync_at.json
+build/
+dist/
+gui.spec
